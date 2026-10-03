@@ -1,0 +1,243 @@
+// supabase/functions/export-document/index.ts
+//
+// POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "format": "docx" | "pdf" }
+//
+// Access follows the same rules as everywhere else: the record is fetched
+// using the CALLER's own login token, so Row Level Security decides what
+// they're allowed to see. If RLS blocks it, the query simply returns no
+// row and this function reports "not found / no access" rather than ever
+// bypassing the rules.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  Document, Packer, Paragraph, TextRun, HeadingLevel,
+  Table, TableRow, TableCell, WidthType,
+} from "https://esm.sh/docx@8.5.0";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+
+const BLOOMS_LABELS: Record<number, string> = {
+  1: "Remembering", 2: "Understanding", 3: "Applying",
+  4: "Analyzing", 5: "Evaluating", 6: "Creating",
+};
+
+Deno.serve(async (req) => {
+  try {
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Use POST" }), { status: 405 });
+    }
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const { table, record_id, format } = await req.json();
+
+    if (!["curricula", "weekly_plans"].includes(table) || !record_id || !["docx", "pdf"].includes(format)) {
+      return new Response(JSON.stringify({ error: "Missing or invalid table/record_id/format" }), { status: 400 });
+    }
+
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    let fileBytes: Uint8Array;
+    let fileName: string;
+
+    if (table === "curricula") {
+      const { data: curriculum, error } = await userClient
+        .from("curricula")
+        .select("*, subjects(name, grade_level)")
+        .eq("id", record_id)
+        .single();
+
+      if (error || !curriculum) {
+        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404 });
+      }
+
+      fileName = `${curriculum.title.replace(/[^a-z0-9]+/gi, "_")}.${format}`;
+      fileBytes = format === "docx"
+        ? await buildCurriculumDocx(curriculum)
+        : await buildCurriculumPdf(curriculum);
+
+    } else {
+      const { data: plan, error: planError } = await userClient
+        .from("weekly_plans")
+        .select("*, subjects(name), profiles(full_name)")
+        .eq("id", record_id)
+        .single();
+
+      if (planError || !plan) {
+        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404 });
+      }
+
+      const { data: periods } = await userClient
+        .from("lesson_periods")
+        .select("*")
+        .eq("weekly_plan_id", record_id)
+        .order("created_at", { ascending: true });
+
+      fileName = `WeeklyPlan_Wk${plan.week_number}_${plan.subjects?.name ?? "Subject"}.${format}`
+        .replace(/[^a-z0-9._]+/gi, "_");
+      fileBytes = format === "docx"
+        ? await buildWeeklyPlanDocx(plan, periods ?? [])
+        : await buildWeeklyPlanPdf(plan, periods ?? []);
+    }
+
+    return new Response(fileBytes, {
+      status: 200,
+      headers: {
+        "Content-Type": format === "docx"
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "application/pdf",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+  }
+});
+
+// ---------------- DOCX builders ----------------
+
+async function buildCurriculumDocx(c: any): Promise<Uint8Array> {
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ text: c.title, heading: HeadingLevel.TITLE }),
+        new Paragraph({ text: `Subject: ${c.subjects?.name ?? ""}  |  Grade: ${c.subjects?.grade_level ?? ""}  |  Year: ${c.academic_year ?? ""}` }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: "Learning Objectives", heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({ text: c.learning_objectives ?? "" }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: "Standards", heading: HeadingLevel.HEADING_2 }),
+        new Paragraph({ text: c.standards ?? "" }),
+      ],
+    }],
+  });
+  return await Packer.toBuffer(doc);
+}
+
+async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Array> {
+  const children: Paragraph[] = [
+    new Paragraph({ text: "Weekly Lesson Plan", heading: HeadingLevel.TITLE }),
+    new Paragraph({ text: `Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}` }),
+    new Paragraph({ text: `Subject: ${plan.subjects?.name ?? ""}   Teacher: ${plan.profiles?.full_name ?? ""}` }),
+    new Paragraph({ text: `Date: ${plan.date_from} to ${plan.date_to}` }),
+    new Paragraph({ text: "" }),
+  ];
+
+  const tableRows: TableRow[] = [
+    new TableRow({
+      children: ["Class & Date", "Learning Objectives", "Description of Lesson", "Book & Pages", "Bloom's Levels"]
+        .map(h => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })),
+    }),
+  ];
+
+  for (const p of periods) {
+    tableRows.push(new TableRow({
+      children: [
+        p.class_and_date, p.learning_objectives, p.description_of_lesson, p.book_pages,
+        (p.blooms_levels ?? []).map((n: number) => BLOOMS_LABELS[n] ?? n).join(", "),
+      ].map(v => new TableCell({ children: [new Paragraph({ text: String(v ?? "") })] })),
+    }));
+    tableRows.push(new TableRow({
+      children: [new TableCell({
+        columnSpan: 5,
+        children: [
+          new Paragraph({ text: `Materials/Resources: ${p.materials_resources ?? ""}` }),
+          new Paragraph({ text: `Differentiation: ${p.differentiation ?? ""}` }),
+          new Paragraph({ text: `Reflection: ${p.reflection ?? ""}` }),
+          new Paragraph({ text: `Classwork: ${p.classwork ?? ""}` }),
+          new Paragraph({ text: `Homework: ${p.homework ?? ""}` }),
+        ],
+      })],
+    }));
+  }
+
+  const table = new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } });
+
+  const doc = new Document({ sections: [{ children: [...children, table] }] });
+  return await Packer.toBuffer(doc);
+}
+
+// ---------------- PDF builders ----------------
+// Simple, legible layout — not a pixel-perfect recreation of the template.
+
+async function buildCurriculumPdf(c: any): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  let page = pdf.addPage();
+  let y = page.getHeight() - 50;
+  const left = 50;
+
+  const writeLine = (text: string, size = 11, useBold = false, gap = 16) => {
+    if (y < 50) { page = pdf.addPage(); y = page.getHeight() - 50; }
+    page.drawText(text, { x: left, y, size, font: useBold ? bold : font, color: rgb(0, 0, 0) });
+    y -= gap;
+  };
+
+  writeLine(c.title, 20, true, 30);
+  writeLine(`Subject: ${c.subjects?.name ?? ""}   Grade: ${c.subjects?.grade_level ?? ""}   Year: ${c.academic_year ?? ""}`);
+  writeLine("");
+  writeLine("Learning Objectives", 14, true, 20);
+  for (const line of wrapText(c.learning_objectives ?? "", 90)) writeLine(line);
+  writeLine("");
+  writeLine("Standards", 14, true, 20);
+  for (const line of wrapText(c.standards ?? "", 90)) writeLine(line);
+
+  return await pdf.save();
+}
+
+async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  let page = pdf.addPage();
+  let y = page.getHeight() - 50;
+  const left = 50;
+
+  const writeLine = (text: string, size = 11, useBold = false, gap = 16) => {
+    if (y < 50) { page = pdf.addPage(); y = page.getHeight() - 50; }
+    page.drawText(text, { x: left, y, size, font: useBold ? bold : font, color: rgb(0, 0, 0) });
+    y -= gap;
+  };
+
+  writeLine("Weekly Lesson Plan", 20, true, 30);
+  writeLine(`Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}`);
+  writeLine(`Subject: ${plan.subjects?.name ?? ""}   Teacher: ${plan.profiles?.full_name ?? ""}`);
+  writeLine(`Date: ${plan.date_from} to ${plan.date_to}`);
+  writeLine("");
+
+  for (const p of periods) {
+    writeLine(`Class & Date: ${p.class_and_date ?? ""}`, 12, true, 18);
+    for (const line of wrapText(`Learning Objectives: ${p.learning_objectives ?? ""}`, 90)) writeLine(line);
+    for (const line of wrapText(`Description: ${p.description_of_lesson ?? ""}`, 90)) writeLine(line);
+    writeLine(`Book & Pages: ${p.book_pages ?? ""}`);
+    writeLine(`Bloom's Levels: ${(p.blooms_levels ?? []).map((n: number) => BLOOMS_LABELS[n] ?? n).join(", ")}`);
+    for (const line of wrapText(`Materials: ${p.materials_resources ?? ""}`, 90)) writeLine(line);
+    for (const line of wrapText(`Differentiation: ${p.differentiation ?? ""}`, 90)) writeLine(line);
+    for (const line of wrapText(`Reflection: ${p.reflection ?? ""}`, 90)) writeLine(line);
+    writeLine(`Classwork: ${p.classwork ?? ""}`);
+    writeLine(`Homework: ${p.homework ?? ""}`);
+    writeLine("");
+  }
+
+  return await pdf.save();
+}
+
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if ((current + " " + word).trim().length > maxChars) {
+      lines.push(current.trim());
+      current = word;
+    } else {
+      current += " " + word;
+    }
+  }
+  if (current.trim()) lines.push(current.trim());
+  return lines.length ? lines : [""];
+}
