@@ -2,66 +2,50 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import CurriculumForm from './components/CurriculumForm'
-import WeeklyPlansSection from './components/WeeklyPlansSection'
 
 export default function TeacherDashboard({ userId }) {
-  const [tab, setTab] = useState('curricula')
   const [subjects, setSubjects] = useState([])
+  const [curricula, setCurricula] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [editing, setEditing] = useState(null) // { subjectId, curriculum|null }
 
-  async function loadSubjects() {
+  async function loadData() {
     setLoading(true)
-    const { data, error } = await supabase
+    setError(null)
+
+    const { data: assignments, error: aErr } = await supabase
       .from('teacher_subjects')
       .select('subject_id, subjects(id, name, grade_level)')
       .eq('teacher_id', userId)
-    if (error) setError(error.message)
-    setSubjects((data ?? []).map(a => a.subjects))
+
+    if (aErr) { setError(aErr.message); setLoading(false); return }
+
+    const mySubjects = (assignments ?? []).map(a => a.subjects)
+    setSubjects(mySubjects)
+
+    if (mySubjects.length > 0) {
+      const { data: curriculaData, error: cErr } = await supabase
+        .from('curricula')
+        .select('*')
+        .in('subject_id', mySubjects.map(s => s.id))
+        .order('academic_year', { ascending: false })
+      if (cErr) setError(cErr.message)
+      else setCurricula(curriculaData)
+    } else {
+      setCurricula([])
+    }
+
     setLoading(false)
   }
 
-  useEffect(() => { loadSubjects() }, [userId])
+  useEffect(() => { loadData() }, [userId])
 
   if (loading) return <p>Loading…</p>
-  if (error) return <p className="error">{error}</p>
 
   if (subjects.length === 0) {
     return <p>You haven't been assigned to any subjects yet — ask an admin to assign you one.</p>
   }
-
-  return (
-    <div>
-      <nav className="tabs">
-        <button className={tab === 'curricula' ? 'active' : ''} onClick={() => setTab('curricula')}>Curricula</button>
-        <button className={tab === 'weekly' ? 'active' : ''} onClick={() => setTab('weekly')}>Weekly Lesson Plans</button>
-      </nav>
-
-      {tab === 'curricula' && <CurriculaSection subjects={subjects} userId={userId} />}
-      {tab === 'weekly' && <WeeklyPlansSection subjects={subjects} userId={userId} />}
-    </div>
-  )
-}
-
-function CurriculaSection({ subjects, userId }) {
-  const [curricula, setCurricula] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [editing, setEditing] = useState(null)
-
-  async function loadCurricula() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('curricula')
-      .select('*')
-      .in('subject_id', subjects.map(s => s.id))
-      .order('academic_year', { ascending: false })
-    if (error) setError(error.message)
-    else setCurricula(data)
-    setLoading(false)
-  }
-
-  useEffect(() => { loadCurricula() }, [subjects])
 
   if (editing) {
     return (
@@ -71,14 +55,12 @@ function CurriculaSection({ subjects, userId }) {
           subjectId={editing.subjectId}
           existing={editing.curriculum}
           userId={userId}
-          onSaved={() => { setEditing(null); loadCurricula() }}
+          onSaved={() => { setEditing(null); loadData() }}
           onCancel={() => setEditing(null)}
         />
       </div>
     )
   }
-
-  if (loading) return <p>Loading…</p>
 
   return (
     <div>

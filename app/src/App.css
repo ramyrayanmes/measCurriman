@@ -237,3 +237,38 @@ button.danger {
 button.secondary {
   background: #6b7280;
 }
+/* Append to the BOTTOM of App.css, after the previous two additions */
+
+.period-form {
+  max-width: 700px;
+}
+
+.field-label {
+  font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.3rem;
+}
+
+.period-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 0.75rem 0;
+}
+
+.period-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.period-card-header div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.period-card p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
