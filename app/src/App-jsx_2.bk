@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AdminDashboard from './AdminDashboard'
-import TeacherDashboard from './TeacherDashboard'
 import './App.css'
 
 export default function App() {
@@ -98,7 +97,7 @@ function Dashboard({ session, profile }) {
 
       <main>
         {profile?.role === 'admin' && <AdminDashboard />}
-        {profile?.role === 'teacher' && <TeacherDashboard userId={session.user.id} />}
+        {profile?.role === 'teacher' && <p>Teacher dashboard coming next.</p>}
         {profile?.role === 'auditor' && <p>Auditor dashboard coming next.</p>}
         {!profile && <p>Loading your profile…</p>}
       </main>
