@@ -6,20 +6,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
   try {
     if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Use POST" }), { status: 405, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Use POST" }), { status: 405 });
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -27,12 +17,10 @@ Deno.serve(async (req) => {
     const { table, record_id, version_number } = body;
 
     if (!["curricula", "weekly_plans"].includes(table) || !record_id || !version_number) {
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid table/record_id/version_number" }),
-        { status: 400, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Missing or invalid table/record_id/version_number" }), { status: 400 });
     }
 
+    // Client acting AS the caller, so RLS tells us who they really are and what role they have
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -41,7 +29,7 @@ Deno.serve(async (req) => {
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401 });
     }
 
     const { data: profile, error: profileError } = await userClient
@@ -51,9 +39,10 @@ Deno.serve(async (req) => {
       .single();
 
     if (profileError || profile?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Only admins may restore a version" }), { status: 403, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Only admins may restore a version" }), { status: 403 });
     }
 
+    // Service-role client to actually perform the restore (the SQL functions are security definer)
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -67,9 +56,9 @@ Deno.serve(async (req) => {
     const { error: rpcError } = await adminClient.rpc(fn, params);
     if (rpcError) throw rpcError;
 
-    return new Response(JSON.stringify({ restored: true }), { status: 200, headers: corsHeaders });
+    return new Response(JSON.stringify({ restored: true }), { status: 200 });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
   }
 });

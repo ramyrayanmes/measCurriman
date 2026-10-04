@@ -1,6 +1,12 @@
 // supabase/functions/export-document/index.ts
 //
 // POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "format": "docx" | "pdf" }
+//
+// Access follows the same rules as everywhere else: the record is fetched
+// using the CALLER's own login token, so Row Level Security decides what
+// they're allowed to see. If RLS blocks it, the query simply returns no
+// row and this function reports "not found / no access" rather than ever
+// bypassing the rules.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -9,36 +15,22 @@ import {
 } from "https://esm.sh/docx@8.5.0";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Expose-Headers": "Content-Disposition",
-};
-
 const BLOOMS_LABELS: Record<number, string> = {
   1: "Remembering", 2: "Understanding", 3: "Applying",
   4: "Analyzing", 5: "Evaluating", 6: "Creating",
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
   try {
     if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Use POST" }), { status: 405, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Use POST" }), { status: 405 });
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const { table, record_id, format } = await req.json();
 
     if (!["curricula", "weekly_plans"].includes(table) || !record_id || !["docx", "pdf"].includes(format)) {
-      return new Response(
-        JSON.stringify({ error: "Missing or invalid table/record_id/format" }),
-        { status: 400, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Missing or invalid table/record_id/format" }), { status: 400 });
     }
 
     const userClient = createClient(
@@ -58,7 +50,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (error || !curriculum) {
-        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404 });
       }
 
       fileName = `${curriculum.title.replace(/[^a-z0-9]+/gi, "_")}.${format}`;
@@ -74,7 +66,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (planError || !plan) {
-        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404 });
       }
 
       const { data: periods } = await userClient
@@ -93,7 +85,6 @@ Deno.serve(async (req) => {
     return new Response(fileBytes, {
       status: 200,
       headers: {
-        ...corsHeaders,
         "Content-Type": format === "docx"
           ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           : "application/pdf",
@@ -102,7 +93,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
   }
 });
 
@@ -170,6 +161,7 @@ async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Arra
 }
 
 // ---------------- PDF builders ----------------
+// Simple, legible layout — not a pixel-perfect recreation of the template.
 
 async function buildCurriculumPdf(c: any): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
