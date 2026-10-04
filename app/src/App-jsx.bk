@@ -1,7 +1,6 @@
 // src/App.jsx
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
-import AdminDashboard from './AdminDashboard'
 import './App.css'
 
 export default function App() {
@@ -29,7 +28,7 @@ export default function App() {
     }
     supabase
       .from('profiles')
-      .select('full_name, role, email')
+      .select('full_name, role')
       .eq('id', session.user.id)
       .single()
       .then(({ data, error }) => {
@@ -56,7 +55,9 @@ function Login() {
     e.preventDefault()
     setSubmitting(true)
     setError(null)
+
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+
     if (error) setError(error.message)
     setSubmitting(false)
   }
@@ -67,14 +68,26 @@ function Login() {
       <form onSubmit={handleSubmit} className="login-form">
         <label>
           Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
         </label>
         <label>
           Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </label>
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}</button>
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Signing in…' : 'Sign in'}
+        </button>
       </form>
     </div>
   )
@@ -86,21 +99,14 @@ function Dashboard({ session, profile }) {
   }
 
   return (
-    <div className="dashboard-shell">
-      <header className="top-bar">
-        <h1>Curriculum Portal</h1>
-        <div className="top-bar-user">
-          <span>{profile?.full_name ?? session.user.email} ({profile?.role ?? '…'})</span>
-          <button onClick={handleSignOut}>Sign out</button>
-        </div>
-      </header>
-
-      <main>
-        {profile?.role === 'admin' && <AdminDashboard />}
-        {profile?.role === 'teacher' && <p>Teacher dashboard coming next.</p>}
-        {profile?.role === 'auditor' && <p>Auditor dashboard coming next.</p>}
-        {!profile && <p>Loading your profile…</p>}
-      </main>
+    <div className="dashboard-container">
+      <h1>Curriculum Portal</h1>
+      <p>Signed in as <strong>{session.user.email}</strong></p>
+      <p>Role: <strong>{profile?.role ?? 'loading…'}</strong></p>
+      <p>Name: <strong>{profile?.full_name ?? 'loading…'}</strong></p>
+      <button onClick={handleSignOut}>Sign out</button>
+      <hr />
+      <p><em>The rest of the portal (subjects, curricula, lesson plans) builds out from here.</em></p>
     </div>
   )
 }
