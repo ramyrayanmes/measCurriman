@@ -3,15 +3,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import WeeklyPlanHeaderForm from './WeeklyPlanHeaderForm'
 import LessonPeriodForm from './LessonPeriodForm'
-import VersionHistoryAndExport from './VersionHistoryAndExport'
 
 const BLOOMS_LABELS = { 1: 'Remembering', 2: 'Understanding', 3: 'Applying', 4: 'Analyzing', 5: 'Evaluating', 6: 'Creating' }
 
-export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canRestore, onBack }) {
+export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, onBack }) {
   const [plan, setPlan] = useState(existingPlan)
   const [periods, setPeriods] = useState([])
   const [loading, setLoading] = useState(!!existingPlan)
-  const [editingPeriod, setEditingPeriod] = useState(null)
+  const [editingPeriod, setEditingPeriod] = useState(null) // null | 'new' | period object
 
   async function loadPeriods() {
     if (!plan) return
@@ -30,12 +29,6 @@ export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canR
   async function handleDeletePeriod(id) {
     if (!confirm('Delete this class period?')) return
     await supabase.from('lesson_periods').delete().eq('id', id)
-    loadPeriods()
-  }
-
-  async function refreshPlan() {
-    const { data } = await supabase.from('weekly_plans').select('*').eq('id', plan.id).single()
-    if (data) setPlan(data)
     loadPeriods()
   }
 
@@ -96,13 +89,6 @@ export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canR
           {periods.length === 0 && <p className="muted">No class periods added yet.</p>}
         </>
       )}
-
-      <VersionHistoryAndExport
-        table="weekly_plans"
-        recordId={plan.id}
-        canRestore={canRestore}
-        onRestored={refreshPlan}
-      />
     </div>
   )
 }

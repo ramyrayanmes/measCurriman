@@ -97,7 +97,7 @@ function Dashboard({ session, profile }) {
       </header>
 
       <main>
-        {profile?.role === 'admin' && <AdminDashboard userId={session.user.id} />}
+        {profile?.role === 'admin' && <AdminDashboard />}
         {profile?.role === 'teacher' && <TeacherDashboard userId={session.user.id} />}
         {profile?.role === 'auditor' && <p>Auditor dashboard coming next.</p>}
         {!profile && <p>Loading your profile…</p>}

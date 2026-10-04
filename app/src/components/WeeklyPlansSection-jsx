@@ -3,11 +3,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import WeeklyPlanEditor from './WeeklyPlanEditor'
 
-export default function WeeklyPlansSection({ subjects, userId, canRestore }) {
+export default function WeeklyPlansSection({ subjects, userId }) {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [editing, setEditing] = useState(null)
+  const [editing, setEditing] = useState(null) // { subjectId, plan: existingPlan|null }
 
   async function loadPlans() {
     setLoading(true)
@@ -30,7 +30,6 @@ export default function WeeklyPlansSection({ subjects, userId, canRestore }) {
         subjectId={editing.subjectId}
         existingPlan={editing.plan}
         userId={userId}
-        canRestore={canRestore}
         onBack={() => { setEditing(null); loadPlans() }}
       />
     )
