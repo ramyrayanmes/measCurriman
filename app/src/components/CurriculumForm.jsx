@@ -68,6 +68,7 @@ export default function CurriculumForm({ subjectId, existing, userId, canRestore
           recordId={existing.id}
           canRestore={canRestore}
           onRestored={onSaved}
+		  canManageVersions={canRestore}
         />
       )}
     </div>

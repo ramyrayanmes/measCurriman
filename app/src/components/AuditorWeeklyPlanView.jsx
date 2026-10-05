@@ -49,6 +49,7 @@ export default function AuditorWeeklyPlanView({ plan, onBack }) {
         table="weekly_plans"
         recordId={plan.id}
         canRestore={false}
+		canManageVersions={false}
       />
     </div>
   )

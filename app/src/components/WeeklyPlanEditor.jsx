@@ -102,6 +102,7 @@ export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canR
         recordId={plan.id}
         canRestore={canRestore}
         onRestored={refreshPlan}
+		canManageVersions={canRestore}
       />
     </div>
   )

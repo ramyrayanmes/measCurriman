@@ -405,3 +405,53 @@ button.secondary {
   color: #16a34a;
   font-size: 0.9rem;
 }
+/* Append to the BOTTOM of App.css */
+
+.version-list-item {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0.5rem 0;
+}
+
+.version-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.version-row-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.version-name {
+  font-weight: 600;
+}
+
+.version-meta {
+  font-size: 0.8rem;
+  margin-top: 0.1rem;
+}
+
+.version-notes {
+  font-size: 0.85rem;
+  background: #fefce8;
+  border-left: 3px solid #fde047;
+  padding: 0.3rem 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.version-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.version-edit-form input,
+.version-edit-form textarea {
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+}
