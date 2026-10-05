@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import AdminDashboard from './AdminDashboard'
 import TeacherDashboard from './TeacherDashboard'
-import AuditorDashboard from './AuditorDashboard'
 import './App.css'
 
 export default function App() {
@@ -100,7 +99,7 @@ function Dashboard({ session, profile }) {
       <main>
         {profile?.role === 'admin' && <AdminDashboard userId={session.user.id} />}
         {profile?.role === 'teacher' && <TeacherDashboard userId={session.user.id} />}
-        {profile?.role === 'auditor' && <AuditorDashboard userId={session.user.id} />}
+        {profile?.role === 'auditor' && <p>Auditor dashboard coming next.</p>}
         {!profile && <p>Loading your profile…</p>}
       </main>
     </div>
