@@ -1,23 +1,14 @@
 // src/components/UsersManager.jsx
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { callEdgeFunctionJson } from '../edgeFunctions'
 
 export default function UsersManager() {
   const [users, setUsers] = useState([])
   const [subjects, setSubjects] = useState([])
-  const [teacherSubjects, setTeacherSubjects] = useState([])
-  const [auditorSubjects, setAuditorSubjects] = useState([])
+  const [teacherSubjects, setTeacherSubjects] = useState([]) // [{teacher_id, subject_id}]
+  const [auditorSubjects, setAuditorSubjects] = useState([]) // [{auditor_id, subject_id}]
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
-  // New-user form state
-  const [newEmail, setNewEmail] = useState('')
-  const [newFullName, setNewFullName] = useState('')
-  const [newRole, setNewRole] = useState('teacher')
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState(null)
-  const [justCreated, setJustCreated] = useState(null) // { email, temp_password }
 
   async function loadAll() {
     setLoading(true)
@@ -36,26 +27,6 @@ export default function UsersManager() {
   }
 
   useEffect(() => { loadAll() }, [])
-
-  async function handleCreateUser(e) {
-    e.preventDefault()
-    setCreating(true)
-    setCreateError(null)
-    setJustCreated(null)
-    try {
-      const result = await callEdgeFunctionJson('create-user', {
-        email: newEmail,
-        full_name: newFullName,
-        role: newRole,
-      })
-      setJustCreated({ email: result.email, temp_password: result.temp_password })
-      setNewEmail(''); setNewFullName(''); setNewRole('teacher')
-      loadAll()
-    } catch (err) {
-      setCreateError(err.message)
-    }
-    setCreating(false)
-  }
 
   async function handleRoleChange(userId, newRole) {
     const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
@@ -82,30 +53,10 @@ export default function UsersManager() {
   return (
     <div>
       <h2>Users</h2>
-
-      <div className="user-card">
-        <h3>Create new user</h3>
-        <form onSubmit={handleCreateUser} className="inline-form">
-          <input placeholder="Full name" value={newFullName} onChange={e => setNewFullName(e.target.value)} required />
-          <input type="email" placeholder="Email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
-          <select value={newRole} onChange={e => setNewRole(e.target.value)}>
-            <option value="teacher">teacher</option>
-            <option value="auditor">auditor</option>
-            <option value="admin">admin</option>
-          </select>
-          <button type="submit" disabled={creating}>{creating ? 'Creating…' : 'Create account'}</button>
-        </form>
-        {createError && <p className="error">{createError}</p>}
-        {justCreated && (
-          <div className="temp-password-box">
-            <strong>Account created.</strong> Share this temporary password with {justCreated.email} —
-            it will only be shown here once:
-            <div className="temp-password-value">{justCreated.temp_password}</div>
-            <span className="muted">They should change it after logging in (we'll build that screen next, or they can use Supabase's password reset for now).</span>
-          </div>
-        )}
-      </div>
-
+      <p className="hint">
+        New accounts are still created manually in Supabase (Authentication → Users) for now —
+        this screen manages their role and which subjects they can access.
+      </p>
       {error && <p className="error">{error}</p>}
 
       {users.map(user => {
