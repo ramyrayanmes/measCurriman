@@ -399,3 +399,9 @@ button.secondary {
   margin: 0.5rem 0;
   display: inline-block;
 }
+/* Append to the BOTTOM of App.css */
+
+.success {
+  color: #16a34a;
+  font-size: 0.9rem;
+}
