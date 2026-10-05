@@ -4,7 +4,6 @@ import { supabase } from './supabaseClient'
 import AdminDashboard from './AdminDashboard'
 import TeacherDashboard from './TeacherDashboard'
 import AuditorDashboard from './AuditorDashboard'
-import NotificationsPanel from './components/NotificationsPanel'
 import './App.css'
 
 export default function App() {
@@ -93,7 +92,6 @@ function Dashboard({ session, profile }) {
       <header className="top-bar">
         <h1>Curriculum Portal</h1>
         <div className="top-bar-user">
-          {profile?.role === 'admin' && <NotificationsPanel userId={session.user.id} />}
           <span>{profile?.full_name ?? session.user.email} ({profile?.role ?? '…'})</span>
           <button onClick={handleSignOut}>Sign out</button>
         </div>

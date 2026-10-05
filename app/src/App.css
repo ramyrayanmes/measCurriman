@@ -300,3 +300,81 @@ button.secondary {
   border-bottom: 1px solid #f0f0f0;
   font-size: 0.9rem;
 }
+/* Append to the BOTTOM of App.css, after the previous additions */
+
+.notifications-panel {
+  position: relative;
+}
+
+.bell-button {
+  position: relative;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #dc2626;
+  color: white;
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 999px;
+  line-height: 1.2;
+}
+
+.notifications-dropdown {
+  position: absolute;
+  right: 0;
+  top: 2.2rem;
+  width: 320px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 10;
+  padding: 0.5rem;
+}
+
+.notifications-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0.3rem 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 0.4rem;
+}
+
+.notification-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.3rem;
+  border-bottom: 1px solid #f5f5f5;
+  font-size: 0.85rem;
+}
+
+.notification-item.unread {
+  background: #eff6ff;
+}
+
+.notification-item p {
+  margin: 0.2rem 0;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0;
+  white-space: nowrap;
+}
