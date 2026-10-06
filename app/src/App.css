@@ -455,3 +455,76 @@ button.secondary {
   border-radius: 4px;
   font-family: inherit;
 }
+/* Append to the BOTTOM of App.css */
+
+.preview-panel, .compare-view {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.snapshot-view p {
+  margin: 0.3rem 0;
+}
+
+.diff-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.diff-list li {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #eee;
+  font-size: 0.85rem;
+}
+
+.diff-old {
+  color: #dc2626;
+  text-decoration: line-through;
+}
+
+.diff-new {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.side-by-side {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.side-by-side-col {
+  flex: 1;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 0.5rem;
+  overflow-x: auto;
+}
+/* Append to the BOTTOM of App.css */
+
+.panel-with-close {
+  position: relative;
+}
+
+.close-x {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+  padding: 0.1rem 0.3rem;
+}
+
+.close-x:hover {
+  color: #111;
+}

@@ -2,8 +2,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { callEdgeFunctionJson, downloadFromEdgeFunction } from '../edgeFunctions'
-import SnapshotView from './SnapshotView'
-import CompareView from './CompareView'
 
 export default function VersionHistoryAndExport({ table, recordId, canRestore, canManageVersions, onRestored }) {
   const [versions, setVersions] = useState([])
@@ -13,9 +11,6 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
   const [editingVersionId, setEditingVersionId] = useState(null)
   const [editName, setEditName] = useState('')
   const [editNotes, setEditNotes] = useState('')
-  const [previewing, setPreviewing] = useState(null) // version object
-  const [comparing, setComparing] = useState(null) // version object
-  const [currentSnapshot, setCurrentSnapshot] = useState(null)
 
   const versionsView = table === 'curricula' ? 'curriculum_versions_secure' : 'weekly_plan_versions_secure'
   const idColumn = table === 'curricula' ? 'curriculum_id' : 'weekly_plan_id'
@@ -25,7 +20,7 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
     setLoading(true)
     const { data, error } = await supabase
       .from(versionsView)
-      .select('id, version_number, name, notes, snapshot, created_by_email, created_at')
+      .select('id, version_number, name, notes, created_by_email, created_at')
       .eq(idColumn, recordId)
       .order('version_number', { ascending: false })
     if (error) setError(error.message)
@@ -34,17 +29,6 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
   }
 
   useEffect(() => { loadVersions() }, [recordId])
-
-  async function fetchCurrentSnapshot() {
-    if (table === 'curricula') {
-      const { data } = await supabase.from('curricula').select('*').eq('id', recordId).single()
-      return data
-    } else {
-      const { data: plan } = await supabase.from('weekly_plans').select('*').eq('id', recordId).single()
-      const { data: periods } = await supabase.from('lesson_periods').select('*').eq('weekly_plan_id', recordId)
-      return { plan, periods: periods ?? [] }
-    }
-  }
 
   async function handleRestore(versionNumber) {
     if (!confirm(`Restore to version ${versionNumber}? This creates a new version from it — nothing is deleted.`)) return
@@ -89,21 +73,6 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
     loadVersions()
   }
 
-  async function handlePreview(v) {
-    setPreviewing(previewing?.id === v.id ? null : v)
-    setComparing(null)
-  }
-
-  async function handleCompare(v) {
-    if (comparing?.id === v.id) { setComparing(null); return }
-    setBusyAction(`compare-${v.id}`)
-    const current = await fetchCurrentSnapshot()
-    setCurrentSnapshot(current)
-    setComparing(v)
-    setPreviewing(null)
-    setBusyAction(null)
-  }
-
   return (
     <div className="version-panel">
       <div className="export-buttons">
@@ -142,44 +111,26 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="version-row">
-                    <div>
-                      <strong>v{v.version_number}</strong>
-                      {v.name && <span className="version-name"> — {v.name}</span>}
-                      <div className="muted version-meta">
-                        {v.created_by_email ?? 'unknown'} • {new Date(v.created_at).toLocaleString()}
-                      </div>
-                      {v.notes && <div className="version-notes">Notes: {v.notes}</div>}
+                <div className="version-row">
+                  <div>
+                    <strong>v{v.version_number}</strong>
+                    {v.name && <span className="version-name"> — {v.name}</span>}
+                    <div className="muted version-meta">
+                      {v.created_by_email ?? 'unknown'} • {new Date(v.created_at).toLocaleString()}
                     </div>
-                    <div className="version-row-actions">
-                      <button onClick={() => handlePreview(v)} className="secondary">
-                        {previewing?.id === v.id ? 'Hide preview' : 'Preview'}
-                      </button>
-                      <button onClick={() => handleCompare(v)} className="secondary" disabled={busyAction === `compare-${v.id}`}>
-                        {busyAction === `compare-${v.id}` ? 'Loading…' : comparing?.id === v.id ? 'Hide compare' : 'Compare to current'}
-                      </button>
-                      {canManageVersions && (
-                        <button onClick={() => startEditing(v)} className="secondary">Name / Notes</button>
-                      )}
-                      {canRestore && (
-                        <button onClick={() => handleRestore(v.version_number)} disabled={busyAction === `restore-${v.version_number}`} className="secondary">
-                          {busyAction === `restore-${v.version_number}` ? 'Restoring…' : 'Restore'}
-                        </button>
-                      )}
-                    </div>
+                    {v.notes && <div className="version-notes">Notes: {v.notes}</div>}
                   </div>
-
-                  {previewing?.id === v.id && ( <div className="preview-panel panel-with-close"> <button className="close-x" onClick={() => setPreviewing(null)} aria-label="Close">×</button> <h5>Preview — v{v.version_number}</h5> <SnapshotView table={table} snapshot={v.snapshot} /> </div>
-                  )}
-
-                  {comparing?.id === v.id && currentSnapshot && (
-                    <CompareView
-                      table={table} oldSnapshot={v.snapshot} newSnapshot={currentSnapshot} oldLabel={`v${v.version_number}${v.name ? ' — ' + v.name : ''}`} newLabel="Current" onClose={() => setComparing(null)}
-                      newLabel="Current"
-                    />
-                  )}
-                </>
+                  <div className="version-row-actions">
+                    {canManageVersions && (
+                      <button onClick={() => startEditing(v)} className="secondary">Name / Notes</button>
+                    )}
+                    {canRestore && (
+                      <button onClick={() => handleRestore(v.version_number)} disabled={busyAction === `restore-${v.version_number}`} className="secondary">
+                        {busyAction === `restore-${v.version_number}` ? 'Restoring…' : 'Restore'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </li>
           ))}
