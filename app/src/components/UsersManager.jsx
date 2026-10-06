@@ -11,6 +11,7 @@ export default function UsersManager() {
   const [subjects, setSubjects] = useState([])
   const [teacherSubjects, setTeacherSubjects] = useState([])
   const [auditorSubjects, setAuditorSubjects] = useState([])
+  const [deptHeadSubjects, setDeptHeadSubjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -23,17 +24,19 @@ export default function UsersManager() {
 
   async function loadAll() {
     setLoading(true)
-    const [{ data: u, error: uErr }, { data: s }, { data: ts }, { data: as_ }] = await Promise.all([
+    const [{ data: u, error: uErr }, { data: s }, { data: ts }, { data: as_ }, { data: dhs }] = await Promise.all([
       supabase.from('profiles').select('*').order('full_name', { ascending: true }),
       supabase.from('subjects').select('*').order('name', { ascending: true }),
       supabase.from('teacher_subjects').select('*'),
       supabase.from('auditor_subjects').select('*'),
+      supabase.from('department_head_subjects').select('*'),
     ])
     if (uErr) setError(uErr.message)
     setUsers(u ?? [])
     setSubjects(s ?? [])
     setTeacherSubjects(ts ?? [])
     setAuditorSubjects(as_ ?? [])
+    setDeptHeadSubjects(dhs ?? [])
     setLoading(false)
   }
 
@@ -79,6 +82,17 @@ export default function UsersManager() {
     loadAll()
   }
 
+  async function toggleDeptHead(userId, subjectId, isAssigned) {
+    if (isAssigned) {
+      const { error } = await supabase.from('department_head_subjects').delete().eq('user_id', userId).eq('subject_id', subjectId)
+      if (error) setError(error.message)
+    } else {
+      const { error } = await supabase.from('department_head_subjects').insert({ user_id: userId, subject_id: subjectId })
+      if (error) setError(error.message)
+    }
+    loadAll()
+  }
+
   if (loading) return <p>Loading…</p>
 
   return (
@@ -113,6 +127,10 @@ export default function UsersManager() {
           .filter(row => (user.role === 'teacher' ? row.teacher_id : row.auditor_id) === user.id)
           .map(row => row.subject_id)
 
+        const deptHeadSubjectIds = deptHeadSubjects
+          .filter(row => row.user_id === user.id)
+          .map(row => row.subject_id)
+
         return (
           <div key={user.id} className="user-card">
             <div className="user-card-header">
@@ -124,7 +142,7 @@ export default function UsersManager() {
 
             {(user.role === 'teacher' || user.role === 'auditor') && (
               <div className="subject-checkboxes">
-                <span className="muted">Assigned subjects:</span>
+                <span className="muted">Assigned subjects ({user.role}):</span>
                 {subjects.map(s => {
                   const isAssigned = assignedSubjectIds.includes(s.id)
                   return (
@@ -145,6 +163,25 @@ export default function UsersManager() {
             {user.role?.startsWith('head_') && (
               <p className="muted">Automatic access to all subjects in their stage — no manual assignment needed.</p>
             )}
+
+            {/* Department Head is independent of primary role — anyone can hold it */}
+            <div className="subject-checkboxes dept-head-row">
+              <span className="muted">Department Head of:</span>
+              {subjects.map(s => {
+                const isHead = deptHeadSubjectIds.includes(s.id)
+                return (
+                  <label key={s.id} className="checkbox-pill">
+                    <input
+                      type="checkbox"
+                      checked={isHead}
+                      onChange={() => toggleDeptHead(user.id, s.id, isHead)}
+                    />
+                    {s.name}
+                  </label>
+                )
+              })}
+              {subjects.length === 0 && <span className="muted">No subjects created yet.</span>}
+            </div>
           </div>
         )
       })}

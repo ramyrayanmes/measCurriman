@@ -6,6 +6,22 @@ import WeeklyPlansSection from './WeeklyPlansSection'
 
 export default function ContentManager({ subjects, userId, canRestore }) {
   const [tab, setTab] = useState('curricula')
+  const [deptHeadSubjectIds, setDeptHeadSubjectIds] = useState(new Set())
+
+  useEffect(() => {
+    supabase
+      .from('department_head_subjects')
+      .select('subject_id')
+      .eq('user_id', userId)
+      .then(({ data }) => setDeptHeadSubjectIds(new Set((data ?? []).map(r => r.subject_id))))
+  }, [userId])
+
+  // Global canRestore (true for admins/Stage Heads) always wins; otherwise,
+  // check whether this specific subject has been granted to this user as
+  // a Department Head assignment.
+  function canManageSubject(subjectId) {
+    return canRestore || deptHeadSubjectIds.has(subjectId)
+  }
 
   if (subjects.length === 0) {
     return <p>No subjects available yet.</p>
@@ -18,13 +34,13 @@ export default function ContentManager({ subjects, userId, canRestore }) {
         <button className={tab === 'weekly' ? 'active' : ''} onClick={() => setTab('weekly')}>Weekly Lesson Plans</button>
       </nav>
 
-      {tab === 'curricula' && <CurriculaSection subjects={subjects} userId={userId} canRestore={canRestore} />}
-      {tab === 'weekly' && <WeeklyPlansSection subjects={subjects} userId={userId} canRestore={canRestore} />}
+      {tab === 'curricula' && <CurriculaSection subjects={subjects} userId={userId} canManageSubject={canManageSubject} />}
+      {tab === 'weekly' && <WeeklyPlansSection subjects={subjects} userId={userId} canManageSubject={canManageSubject} />}
     </div>
   )
 }
 
-function CurriculaSection({ subjects, userId, canRestore }) {
+function CurriculaSection({ subjects, userId, canManageSubject }) {
   const [curricula, setCurricula] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -45,6 +61,7 @@ function CurriculaSection({ subjects, userId, canRestore }) {
   useEffect(() => { loadCurricula() }, [subjects])
 
   if (editing) {
+    const manage = canManageSubject(editing.subjectId)
     return (
       <div>
         <h2>{editing.curriculum ? 'Edit' : 'New'} Curriculum — {subjects.find(s => s.id === editing.subjectId)?.name}</h2>
@@ -52,7 +69,7 @@ function CurriculaSection({ subjects, userId, canRestore }) {
           subjectId={editing.subjectId}
           existing={editing.curriculum}
           userId={userId}
-          canRestore={canRestore}
+          canRestore={manage}
           onSaved={() => { setEditing(null); loadCurricula() }}
           onCancel={() => setEditing(null)}
         />

@@ -1,9 +1,10 @@
 // supabase/functions/restore-version/index.ts
 //
 // POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "version_number": <int> }
-// Admins and Heads (Stage or Department) may call this — actual row access
-// is still enforced by RLS inside the SQL restore functions themselves,
-// so a head can only ever restore something within their own scope.
+// Allowed: admins, Stage Heads (anywhere in their stage), and Department
+// Heads (only for the specific subject they head). RLS enforces the
+// actual scope — this function just confirms the caller can reach the
+// record at all before handing off to the service-role restore.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -45,38 +46,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: corsHeaders });
     }
 
-    const { data: profile, error: profileError } = await userClient
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // Fetching the record with the CALLER's own token doubles as the
+    // access check: RLS (admin / Stage Head / Department Head policies,
+    // all already in place) decides whether this row comes back at all.
+    const { data: record, error: recordError } = await userClient
+      .from(table)
+      .select("id")
+      .eq("id", record_id)
+      .maybeSingle();
 
-    const role = profile?.role ?? "";
-    const isAdminOrHead = role === "admin" || role.startsWith("head_");
-
-    if (profileError || !isAdminOrHead) {
-      return new Response(JSON.stringify({ error: "Only admins and heads may restore a version" }), { status: 403, headers: corsHeaders });
+    if (recordError || !record) {
+      return new Response(JSON.stringify({ error: "Not found or no access to this record" }), { status: 404, headers: corsHeaders });
     }
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    // Even though this runs with the service role, the SQL functions below
-    // only touch the specific row requested — they don't themselves check
-    // scope, so we verify the caller actually has RLS access to this record
-    // using THEIR OWN token first, before performing the restore.
-    const checkTable = table === "curricula" ? "curricula" : "weekly_plans";
-    const { data: accessCheck, error: accessError } = await userClient
-      .from(checkTable)
-      .select("id")
-      .eq("id", record_id)
-      .maybeSingle();
-
-    if (accessError || !accessCheck) {
-      return new Response(JSON.stringify({ error: "Not found or no access to this record" }), { status: 404, headers: corsHeaders });
-    }
 
     const fn = table === "curricula" ? "restore_curriculum_version" : "restore_weekly_plan_version";
     const params = table === "curricula"

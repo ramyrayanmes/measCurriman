@@ -10,12 +10,20 @@ export default function TeacherDashboard({ userId }) {
 
   async function loadSubjects() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('teacher_subjects')
-      .select('subject_id, subjects(id, name, grade_level)')
-      .eq('teacher_id', userId)
-    if (error) setError(error.message)
-    setSubjects((data ?? []).map(a => a.subjects))
+    const [{ data: taught, error: tErr }, { data: headed, error: hErr }] = await Promise.all([
+      supabase.from('teacher_subjects').select('subject_id, subjects(id, name, grade_level)').eq('teacher_id', userId),
+      supabase.from('department_head_subjects').select('subject_id, subjects(id, name, grade_level)').eq('user_id', userId),
+    ])
+    if (tErr) setError(tErr.message)
+    if (hErr) setError(hErr.message)
+
+    // Merge both lists, de-duplicated by subject id — someone might both
+    // teach a subject AND head it.
+    const merged = new Map()
+    for (const row of [...(taught ?? []), ...(headed ?? [])]) {
+      if (row.subjects) merged.set(row.subjects.id, row.subjects)
+    }
+    setSubjects(Array.from(merged.values()))
     setLoading(false)
   }
 
