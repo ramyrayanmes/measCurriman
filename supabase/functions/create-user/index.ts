@@ -1,10 +1,4 @@
 // supabase/functions/create-user/index.ts
-//
-// POST body: { "email": "...", "full_name": "...", "role": "teacher" | "auditor" | "admin" }
-// Only admins may call this. Generates a random temporary password and
-// returns it in the response — the admin shares it with the new user, who
-// changes it themselves on first login (same flow as the manual dashboard
-// process, just without needing dashboard access).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -13,6 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+const VALID_ROLES = [
+  "admin", "teacher", "auditor",
+  "head_kindergarten", "head_elementary", "head_middle", "head_high",
+];
 
 function generateTempPassword(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -36,7 +35,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     const { email, full_name, role } = await req.json();
 
-    if (!email || !full_name || !["admin", "teacher", "auditor"].includes(role)) {
+    if (!email || !full_name || !VALID_ROLES.includes(role)) {
       return new Response(
         JSON.stringify({ error: "Missing or invalid email/full_name/role" }),
         { status: 400, headers: corsHeaders }
@@ -80,8 +79,6 @@ Deno.serve(async (req) => {
 
     if (createError) throw createError;
 
-    // The handle_new_user trigger already created a profiles row defaulted to
-    // 'teacher' — update it to the role the admin actually chose.
     if (role !== "teacher") {
       const { error: roleError } = await adminClient
         .from("profiles")

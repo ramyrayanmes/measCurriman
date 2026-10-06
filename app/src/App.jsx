@@ -6,6 +6,8 @@ import TeacherDashboard from './TeacherDashboard'
 import AuditorDashboard from './AuditorDashboard'
 import NotificationsPanel from './components/NotificationsPanel'
 import ChangePasswordPanel from './components/ChangePasswordPanel'
+import StageHeadDashboard from './StageHeadDashboard'
+import { roleLabel } from './stageUtils'
 import './App.css'
 
 export default function App() {
@@ -95,7 +97,7 @@ function Dashboard({ session, profile }) {
         <h1>Curriculum Portal</h1>
         <div className="top-bar-user">
           {profile?.role === 'admin' && <NotificationsPanel userId={session.user.id} />}
-          <span>{profile?.full_name ?? session.user.email} ({profile?.role ?? '…'})</span>
+          <span>{profile?.full_name ?? session.user.email} ({profile?.role ? roleLabel(profile.role) : '…'})</span>
           <ChangePasswordPanel />
           <button onClick={handleSignOut}>Sign out</button>
         </div>
@@ -105,6 +107,7 @@ function Dashboard({ session, profile }) {
         {profile?.role === 'admin' && <AdminDashboard userId={session.user.id} />}
         {profile?.role === 'teacher' && <TeacherDashboard userId={session.user.id} />}
         {profile?.role === 'auditor' && <AuditorDashboard userId={session.user.id} />}
+        {profile?.role?.startsWith('head_') && <StageHeadDashboard userId={session.user.id} role={profile.role} />}
         {!profile && <p>Loading your profile…</p>}
       </main>
     </div>

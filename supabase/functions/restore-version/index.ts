@@ -1,8 +1,9 @@
 // supabase/functions/restore-version/index.ts
 //
 // POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "version_number": <int> }
-// Only admins may call this. Restoring creates a new version automatically —
-// nothing is silently overwritten, and the restore itself is logged.
+// Admins and Heads (Stage or Department) may call this — actual row access
+// is still enforced by RLS inside the SQL restore functions themselves,
+// so a head can only ever restore something within their own scope.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -50,14 +51,32 @@ Deno.serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    if (profileError || profile?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Only admins may restore a version" }), { status: 403, headers: corsHeaders });
+    const role = profile?.role ?? "";
+    const isAdminOrHead = role === "admin" || role.startsWith("head_");
+
+    if (profileError || !isAdminOrHead) {
+      return new Response(JSON.stringify({ error: "Only admins and heads may restore a version" }), { status: 403, headers: corsHeaders });
     }
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Even though this runs with the service role, the SQL functions below
+    // only touch the specific row requested — they don't themselves check
+    // scope, so we verify the caller actually has RLS access to this record
+    // using THEIR OWN token first, before performing the restore.
+    const checkTable = table === "curricula" ? "curricula" : "weekly_plans";
+    const { data: accessCheck, error: accessError } = await userClient
+      .from(checkTable)
+      .select("id")
+      .eq("id", record_id)
+      .maybeSingle();
+
+    if (accessError || !accessCheck) {
+      return new Response(JSON.stringify({ error: "Not found or no access to this record" }), { status: 404, headers: corsHeaders });
+    }
 
     const fn = table === "curricula" ? "restore_curriculum_version" : "restore_weekly_plan_version";
     const params = table === "curricula"

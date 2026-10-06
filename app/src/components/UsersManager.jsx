@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { callEdgeFunctionJson } from '../edgeFunctions'
+import { roleLabel } from '../stageUtils'
+
+const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_kindergarten', 'head_elementary', 'head_middle', 'head_high']
 
 export default function UsersManager() {
   const [users, setUsers] = useState([])
@@ -11,13 +14,12 @@ export default function UsersManager() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // New-user form state
   const [newEmail, setNewEmail] = useState('')
   const [newFullName, setNewFullName] = useState('')
   const [newRole, setNewRole] = useState('teacher')
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState(null)
-  const [justCreated, setJustCreated] = useState(null) // { email, temp_password }
+  const [justCreated, setJustCreated] = useState(null)
 
   async function loadAll() {
     setLoading(true)
@@ -89,9 +91,7 @@ export default function UsersManager() {
           <input placeholder="Full name" value={newFullName} onChange={e => setNewFullName(e.target.value)} required />
           <input type="email" placeholder="Email" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
           <select value={newRole} onChange={e => setNewRole(e.target.value)}>
-            <option value="teacher">teacher</option>
-            <option value="auditor">auditor</option>
-            <option value="admin">admin</option>
+            {ALL_ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
           </select>
           <button type="submit" disabled={creating}>{creating ? 'Creating…' : 'Create account'}</button>
         </form>
@@ -101,7 +101,7 @@ export default function UsersManager() {
             <strong>Account created.</strong> Share this temporary password with {justCreated.email} —
             it will only be shown here once:
             <div className="temp-password-value">{justCreated.temp_password}</div>
-            <span className="muted">They should change it after logging in (we'll build that screen next, or they can use Supabase's password reset for now).</span>
+            <span className="muted">They can change it themselves after logging in via the "Change password" option.</span>
           </div>
         )}
       </div>
@@ -118,9 +118,7 @@ export default function UsersManager() {
             <div className="user-card-header">
               <strong>{user.full_name}</strong> <span className="muted">({user.email})</span>
               <select value={user.role} onChange={e => handleRoleChange(user.id, e.target.value)}>
-                <option value="admin">admin</option>
-                <option value="teacher">teacher</option>
-                <option value="auditor">auditor</option>
+                {ALL_ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select>
             </div>
 
@@ -142,6 +140,10 @@ export default function UsersManager() {
                 })}
                 {subjects.length === 0 && <span className="muted">No subjects created yet.</span>}
               </div>
+            )}
+
+            {user.role?.startsWith('head_') && (
+              <p className="muted">Automatic access to all subjects in their stage — no manual assignment needed.</p>
             )}
           </div>
         )
