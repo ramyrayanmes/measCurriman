@@ -16,7 +16,8 @@ const PLAN_HEADER_FIELDS = [
 ]
 
 const PERIOD_FIELDS = [
-  { key: 'class_and_date', label: 'Class & Date' },
+  { key: 'class_section', label: 'Class/Section' },
+  { key: 'lesson_date', label: 'Date' },
   { key: 'learning_objectives', label: 'Learning Objectives' },
   { key: 'description_of_lesson', label: 'Description of Lesson' },
   { key: 'book_pages', label: 'Book & Pages' },
@@ -26,6 +27,10 @@ const PERIOD_FIELDS = [
   { key: 'classwork', label: 'Classwork' },
   { key: 'homework', label: 'Homework' },
 ]
+
+function periodLabel(p) {
+  return p?.class_section || p?.class_and_date || 'period'
+}
 
 export function diffCurricula(oldSnap, newSnap) {
   const changes = []
@@ -59,12 +64,12 @@ export function diffWeeklyPlan(oldSnap, newSnap) {
 
   for (const p of newPeriods) {
     if (!oldIds.has(p.id)) {
-      changes.push({ label: `New class period added`, oldVal: '', newVal: p.class_and_date || '(untitled)' })
+      changes.push({ label: `New class period added`, oldVal: '', newVal: periodLabel(p) })
     }
   }
   for (const p of oldPeriods) {
     if (!newIds.has(p.id)) {
-      changes.push({ label: `Class period removed`, oldVal: p.class_and_date || '(untitled)', newVal: '' })
+      changes.push({ label: `Class period removed`, oldVal: periodLabel(p), newVal: '' })
     }
   }
   for (const newP of newPeriods) {
@@ -74,14 +79,14 @@ export function diffWeeklyPlan(oldSnap, newSnap) {
       const oldVal = oldP?.[key] ?? ''
       const newVal = newP?.[key] ?? ''
       if (oldVal !== newVal) {
-        changes.push({ label: `[${newP.class_and_date || 'period'}] ${label}`, oldVal, newVal })
+        changes.push({ label: `[${periodLabel(newP)}] ${label}`, oldVal, newVal })
       }
     }
     const oldBlooms = (oldP?.blooms_levels ?? []).sort().join(',')
     const newBlooms = (newP?.blooms_levels ?? []).sort().join(',')
     if (oldBlooms !== newBlooms) {
       changes.push({
-        label: `[${newP.class_and_date || 'period'}] Bloom's Levels`,
+        label: `[${periodLabel(newP)}] Bloom's Levels`,
         oldVal: oldP?.blooms_levels?.join(', ') ?? '',
         newVal: newP?.blooms_levels?.join(', ') ?? '',
       })

@@ -12,7 +12,8 @@ const BLOOMS = [
 ]
 
 export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCancel }) {
-  const [classAndDate, setClassAndDate] = useState(existing?.class_and_date ?? '')
+  const [classSection, setClassSection] = useState(existing?.class_section ?? '')
+  const [lessonDate, setLessonDate] = useState(existing?.lesson_date ?? '')
   const [learningObjectives, setLearningObjectives] = useState(existing?.learning_objectives ?? '')
   const [description, setDescription] = useState(existing?.description_of_lesson ?? '')
   const [bookPages, setBookPages] = useState(existing?.book_pages ?? '')
@@ -36,7 +37,8 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
 
     const payload = {
       weekly_plan_id: weeklyPlanId,
-      class_and_date: classAndDate,
+      class_section: classSection,
+      lesson_date: lessonDate || null,
       learning_objectives: learningObjectives,
       description_of_lesson: description,
       book_pages: bookPages,
@@ -60,8 +62,12 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
   return (
     <form onSubmit={handleSubmit} className="curriculum-form period-form">
       <label>
-        Class & Date
-        <input value={classAndDate} onChange={e => setClassAndDate(e.target.value)} placeholder="e.g. Grade 5A — Mon Oct 6" />
+        Class / Section
+        <input value={classSection} onChange={e => setClassSection(e.target.value)} placeholder="e.g. Grade 3B" />
+      </label>
+      <label>
+        Date
+        <input type="date" value={lessonDate} onChange={e => setLessonDate(e.target.value)} />
       </label>
       <label>
         Learning Objectives

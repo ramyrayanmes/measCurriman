@@ -1,4 +1,6 @@
 // supabase/functions/export-document/index.ts
+//
+// POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "format": "docx" | "pdf" }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -79,7 +81,7 @@ Deno.serve(async (req) => {
         .from("lesson_periods")
         .select("*")
         .eq("weekly_plan_id", record_id)
-        .order("lesson_date", { ascending: true });
+        .order("created_at", { ascending: true });
 
       fileName = `WeeklyPlan_Wk${plan.week_number}_${plan.subjects?.name ?? "Subject"}.${format}`
         .replace(/[^a-z0-9._]+/gi, "_");
@@ -103,11 +105,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
   }
 });
-
-function periodLabel(p: any): string {
-  const parts = [p.class_section, p.lesson_date].filter(Boolean);
-  return parts.length ? parts.join(" — ") : "(no class/date set)";
-}
 
 // ---------------- DOCX builders ----------------
 
@@ -140,7 +137,7 @@ async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Arra
 
   const tableRows: TableRow[] = [
     new TableRow({
-      children: ["Class/Section", "Date", "Learning Objectives", "Description of Lesson", "Book & Pages", "Bloom's Levels"]
+      children: ["Class & Date", "Learning Objectives", "Description of Lesson", "Book & Pages", "Bloom's Levels"]
         .map(h => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })),
     }),
   ];
@@ -148,13 +145,13 @@ async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Arra
   for (const p of periods) {
     tableRows.push(new TableRow({
       children: [
-        p.class_section, p.lesson_date, p.learning_objectives, p.description_of_lesson, p.book_pages,
+        p.class_and_date, p.learning_objectives, p.description_of_lesson, p.book_pages,
         (p.blooms_levels ?? []).map((n: number) => BLOOMS_LABELS[n] ?? n).join(", "),
       ].map(v => new TableCell({ children: [new Paragraph({ text: String(v ?? "") })] })),
     }));
     tableRows.push(new TableRow({
       children: [new TableCell({
-        columnSpan: 6,
+        columnSpan: 5,
         children: [
           new Paragraph({ text: `Materials/Resources: ${p.materials_resources ?? ""}` }),
           new Paragraph({ text: `Differentiation: ${p.differentiation ?? ""}` }),
@@ -221,7 +218,7 @@ async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array
   writeLine("");
 
   for (const p of periods) {
-    writeLine(periodLabel(p), 12, true, 18);
+    writeLine(`Class & Date: ${p.class_and_date ?? ""}`, 12, true, 18);
     for (const line of wrapText(`Learning Objectives: ${p.learning_objectives ?? ""}`, 90)) writeLine(line);
     for (const line of wrapText(`Description: ${p.description_of_lesson ?? ""}`, 90)) writeLine(line);
     writeLine(`Book & Pages: ${p.book_pages ?? ""}`);

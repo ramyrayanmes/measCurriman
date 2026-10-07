@@ -20,7 +20,7 @@ export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canR
       .from('lesson_periods')
       .select('*')
       .eq('weekly_plan_id', plan.id)
-      .order('created_at', { ascending: true })
+      .order('lesson_date', { ascending: true })
     setPeriods(data ?? [])
     setLoading(false)
   }
@@ -81,7 +81,7 @@ export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canR
           {periods.map(p => (
             <div key={p.id} className="period-card">
               <div className="period-card-header">
-                <strong>{p.class_and_date || '(no class/date set)'}</strong>
+                <strong>{p.class_section || '(no class/section set)'} {p.lesson_date ? `— ${p.lesson_date}` : ''}</strong>
                 <div>
                   <button onClick={() => setEditingPeriod(p)} className="secondary">Edit</button>
                   <button onClick={() => handleDeletePeriod(p.id)} className="danger">Delete</button>
@@ -101,8 +101,8 @@ export default function WeeklyPlanEditor({ subjectId, existingPlan, userId, canR
         table="weekly_plans"
         recordId={plan.id}
         canRestore={canRestore}
+        canManageVersions={canRestore}
         onRestored={refreshPlan}
-		canManageVersions={canRestore}
       />
     </div>
   )

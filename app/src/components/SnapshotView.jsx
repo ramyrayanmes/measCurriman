@@ -16,7 +16,6 @@ export default function SnapshotView({ table, snapshot }) {
     )
   }
 
-  // weekly_plans: snapshot is { plan: {...}, periods: [...] }
   const plan = snapshot.plan ?? snapshot
   const periods = snapshot.periods ?? []
 
@@ -27,7 +26,7 @@ export default function SnapshotView({ table, snapshot }) {
       <h5>Class Periods</h5>
       {periods.map(p => (
         <div key={p.id} className="period-card">
-          <strong>{p.class_and_date || '(no class/date set)'}</strong>
+          <strong>{p.class_section || '(no class/section set)'} {p.lesson_date ? `— ${p.lesson_date}` : ''}</strong>
           <p><strong>Objectives:</strong> {p.learning_objectives}</p>
           <p><strong>Description:</strong> {p.description_of_lesson}</p>
           <p><strong>Book & Pages:</strong> {p.book_pages}</p>

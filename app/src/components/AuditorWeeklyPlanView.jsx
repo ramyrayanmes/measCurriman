@@ -14,7 +14,7 @@ export default function AuditorWeeklyPlanView({ plan, onBack }) {
       .from('lesson_periods')
       .select('*')
       .eq('weekly_plan_id', plan.id)
-      .order('created_at', { ascending: true })
+      .order('lesson_date', { ascending: true })
       .then(({ data }) => { setPeriods(data ?? []); setLoading(false) })
   }, [plan.id])
 
@@ -29,7 +29,7 @@ export default function AuditorWeeklyPlanView({ plan, onBack }) {
         <>
           {periods.map(p => (
             <div key={p.id} className="period-card">
-              <strong>{p.class_and_date || '(no class/date set)'}</strong>
+              <strong>{p.class_section || '(no class/section set)'} {p.lesson_date ? `— ${p.lesson_date}` : ''}</strong>
               <p><strong>Objectives:</strong> {p.learning_objectives}</p>
               <p><strong>Description:</strong> {p.description_of_lesson}</p>
               <p><strong>Book & Pages:</strong> {p.book_pages}</p>
@@ -49,7 +49,7 @@ export default function AuditorWeeklyPlanView({ plan, onBack }) {
         table="weekly_plans"
         recordId={plan.id}
         canRestore={false}
-		canManageVersions={false}
+        canManageVersions={false}
       />
     </div>
   )
