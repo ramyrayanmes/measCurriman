@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import WeeklyPlanEditor from './WeeklyPlanEditor'
+import { downloadFromEdgeFunction } from '../edgeFunctions'
 
 export default function WeeklyPlansSection({ subjects, userId, canManageSubject }) {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [busyAction, setBusyAction] = useState(null) // e.g. "planId-docx"
 
   async function loadPlans() {
     setLoading(true)
@@ -23,6 +25,17 @@ export default function WeeklyPlansSection({ subjects, userId, canManageSubject 
   }
 
   useEffect(() => { loadPlans() }, [subjects])
+
+  async function handleExport(planId, format) {
+    setBusyAction(`${planId}-${format}`)
+    setError(null)
+    try {
+      await downloadFromEdgeFunction('export-document', { table: 'weekly_plans', record_id: planId, format }, `plan.${format}`)
+    } catch (err) {
+      setError(err.message)
+    }
+    setBusyAction(null)
+  }
 
   if (editing) {
     return (
@@ -53,11 +66,27 @@ export default function WeeklyPlansSection({ subjects, userId, canManageSubject 
           </div>
 
           {plans.filter(p => p.subject_id === subject.id).map(p => (
-            <div key={p.id} className="curriculum-row">
+            <div key={p.id} className="curriculum-row plan-row">
               <span>Week {p.week_number} (Sem {p.semester}) — {p.date_from} to {p.date_to}</span>
-              <button onClick={() => setEditing({ subjectId: subject.id, plan: p })} className="secondary">
-                Open
-              </button>
+              <div className="plan-row-actions">
+                <button
+                  onClick={() => handleExport(p.id, 'docx')}
+                  disabled={busyAction === `${p.id}-docx`}
+                  className="secondary"
+                >
+                  {busyAction === `${p.id}-docx` ? 'Preparing…' : 'Word'}
+                </button>
+                <button
+                  onClick={() => handleExport(p.id, 'pdf')}
+                  disabled={busyAction === `${p.id}-pdf`}
+                  className="secondary"
+                >
+                  {busyAction === `${p.id}-pdf` ? 'Preparing…' : 'PDF'}
+                </button>
+                <button onClick={() => setEditing({ subjectId: subject.id, plan: p })} className="secondary">
+                  Open
+                </button>
+              </div>
             </div>
           ))}
 

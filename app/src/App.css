@@ -535,3 +535,13 @@ button.secondary {
   padding-top: 0.5rem;
   border-top: 1px dashed #e5e7eb;
 }
+/* Append to the BOTTOM of App.css */
+
+.plan-row {
+  align-items: center;
+}
+
+.plan-row-actions {
+  display: flex;
+  gap: 0.4rem;
+}

@@ -104,11 +104,6 @@ Deno.serve(async (req) => {
   }
 });
 
-function periodLabel(p: any): string {
-  const parts = [p.class_section, p.lesson_date].filter(Boolean);
-  return parts.length ? parts.join(" — ") : "(no class/date set)";
-}
-
 // ---------------- DOCX builders ----------------
 
 async function buildCurriculumDocx(c: any): Promise<Uint8Array> {
@@ -200,45 +195,127 @@ async function buildCurriculumPdf(c: any): Promise<Uint8Array> {
   return await pdf.save();
 }
 
+// Real bordered table, landscape pages for width. Each period gets a main
+// row (the template's core columns) plus a second full-width row for the
+// longer free-text fields (materials, differentiation, reflection, etc.)
+// — mirroring the Word version's layout.
 async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  let page = pdf.addPage();
-  let y = page.getHeight() - 50;
-  const left = 50;
 
-  const writeLine = (text: string, size = 11, useBold = false, gap = 16) => {
-    if (y < 50) { page = pdf.addPage(); y = page.getHeight() - 50; }
-    page.drawText(text, { x: left, y, size, font: useBold ? bold : font, color: rgb(0, 0, 0) });
-    y -= gap;
-  };
+  const PAGE_W = 792, PAGE_H = 612; // Letter landscape
+  const MARGIN = 40;
+  const FONT_SIZE = 8;
+  const LINE_H = FONT_SIZE + 3;
+  const CELL_PAD = 4;
 
-  writeLine("Weekly Lesson Plan", 20, true, 30);
-  writeLine(`Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}`);
-  writeLine(`Subject: ${plan.subjects?.name ?? ""}   Teacher: ${plan.profiles?.full_name ?? ""}`);
-  writeLine(`Date: ${plan.date_from} to ${plan.date_to}`);
-  writeLine("");
+  const columns = [
+    { key: "class_section", label: "Class/Section", width: 90 },
+    { key: "lesson_date", label: "Date", width: 65 },
+    { key: "learning_objectives", label: "Learning Objectives", width: 150 },
+    { key: "description_of_lesson", label: "Description of Lesson", width: 170 },
+    { key: "book_pages", label: "Book & Pages", width: 90 },
+    { key: "blooms", label: "Bloom's Levels", width: 127 },
+  ];
+  const tableWidth = columns.reduce((sum, c) => sum + c.width, 0);
+
+  let page = pdf.addPage([PAGE_W, PAGE_H]);
+  let y = PAGE_H - MARGIN;
+
+  function drawHeaderInfo() {
+    page.drawText("Weekly Lesson Plan", { x: MARGIN, y, size: 16, font: bold });
+    y -= 20;
+    page.drawText(
+      `Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}   Subject: ${plan.subjects?.name ?? ""}   Teacher: ${plan.profiles?.full_name ?? ""}`,
+      { x: MARGIN, y, size: 10, font }
+    );
+    y -= 14;
+    page.drawText(`Date: ${plan.date_from} to ${plan.date_to}`, { x: MARGIN, y, size: 10, font });
+    y -= 20;
+  }
+
+  function wrapForColumn(text: string, width: number): string[] {
+    const charsPerLine = Math.max(6, Math.floor((width - CELL_PAD * 2) / (FONT_SIZE * 0.55)));
+    return wrapText(text ?? "", charsPerLine);
+  }
+
+  function drawTableHeader() {
+    let x = MARGIN;
+    const headerHeight = LINE_H + CELL_PAD * 2;
+    for (const col of columns) {
+      page.drawRectangle({ x, y: y - headerHeight, width: col.width, height: headerHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.75, color: rgb(0.9, 0.9, 0.9) });
+      page.drawText(col.label, { x: x + CELL_PAD, y: y - CELL_PAD - FONT_SIZE, size: FONT_SIZE, font: bold });
+      x += col.width;
+    }
+    y -= headerHeight;
+  }
+
+  function ensureSpace(neededHeight: number) {
+    if (y - neededHeight < MARGIN) {
+      page = pdf.addPage([PAGE_W, PAGE_H]);
+      y = PAGE_H - MARGIN;
+      drawTableHeader();
+    }
+  }
+
+  drawHeaderInfo();
+  drawTableHeader();
 
   for (const p of periods) {
-    writeLine(periodLabel(p), 12, true, 18);
-    for (const line of wrapText(`Learning Objectives: ${p.learning_objectives ?? ""}`, 90)) writeLine(line);
-    for (const line of wrapText(`Description: ${p.description_of_lesson ?? ""}`, 90)) writeLine(line);
-    writeLine(`Book & Pages: ${p.book_pages ?? ""}`);
-    writeLine(`Bloom's Levels: ${(p.blooms_levels ?? []).map((n: number) => BLOOMS_LABELS[n] ?? n).join(", ")}`);
-    for (const line of wrapText(`Materials: ${p.materials_resources ?? ""}`, 90)) writeLine(line);
-    for (const line of wrapText(`Differentiation: ${p.differentiation ?? ""}`, 90)) writeLine(line);
-    for (const line of wrapText(`Reflection: ${p.reflection ?? ""}`, 90)) writeLine(line);
-    writeLine(`Classwork: ${p.classwork ?? ""}`);
-    writeLine(`Homework: ${p.homework ?? ""}`);
-    writeLine("");
+    const cellLines = columns.map(col => {
+      if (col.key === "blooms") {
+        const text = (p.blooms_levels ?? []).map((n: number) => BLOOMS_LABELS[n] ?? n).join(", ");
+        return wrapForColumn(text, col.width);
+      }
+      return wrapForColumn(p[col.key], col.width);
+    });
+    const mainRowLines = Math.max(1, ...cellLines.map(l => l.length));
+    const mainRowHeight = mainRowLines * LINE_H + CELL_PAD * 2;
+
+    const detailsText = [
+      `Materials/Resources: ${p.materials_resources ?? ""}`,
+      `Differentiation: ${p.differentiation ?? ""}`,
+      `Reflection: ${p.reflection ?? ""}`,
+      `Classwork: ${p.classwork ?? ""}`,
+      `Homework: ${p.homework ?? ""}`,
+    ];
+    const detailsCharsPerLine = Math.max(10, Math.floor((tableWidth - CELL_PAD * 2) / (FONT_SIZE * 0.55)));
+    const detailsLines = detailsText.flatMap(t => wrapText(t, detailsCharsPerLine));
+    const detailsHeight = detailsLines.length * LINE_H + CELL_PAD * 2;
+
+    ensureSpace(mainRowHeight + detailsHeight);
+
+    // Main row
+    let x = MARGIN;
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i];
+      page.drawRectangle({ x, y: y - mainRowHeight, width: col.width, height: mainRowHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.75 });
+      cellLines[i].forEach((line, li) => {
+        page.drawText(line, { x: x + CELL_PAD, y: y - CELL_PAD - FONT_SIZE - li * LINE_H, size: FONT_SIZE, font });
+      });
+      x += col.width;
+    }
+    y -= mainRowHeight;
+
+    // Details row (full width)
+    page.drawRectangle({ x: MARGIN, y: y - detailsHeight, width: tableWidth, height: detailsHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.75 });
+    detailsLines.forEach((line, li) => {
+      page.drawText(line, { x: MARGIN + CELL_PAD, y: y - CELL_PAD - FONT_SIZE - li * LINE_H, size: FONT_SIZE, font });
+    });
+    y -= detailsHeight;
+  }
+
+  if (periods.length === 0) {
+    page.drawText("No class periods in this version.", { x: MARGIN, y: y - 14, size: 10, font });
   }
 
   return await pdf.save();
 }
 
 function wrapText(text: string, maxChars: number): string[] {
-  const words = text.split(/\s+/);
+  const words = (text ?? "").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
   const lines: string[] = [];
   let current = "";
   for (const word of words) {

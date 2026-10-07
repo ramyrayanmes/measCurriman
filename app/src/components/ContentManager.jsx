@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import CurriculumForm from './CurriculumForm'
 import WeeklyPlansSection from './WeeklyPlansSection'
+import { downloadFromEdgeFunction } from '../edgeFunctions'
 
 export default function ContentManager({ subjects, userId, canRestore }) {
   const [tab, setTab] = useState('curricula')
@@ -16,9 +17,6 @@ export default function ContentManager({ subjects, userId, canRestore }) {
       .then(({ data }) => setDeptHeadSubjectIds(new Set((data ?? []).map(r => r.subject_id))))
   }, [userId])
 
-  // Global canRestore (true for admins/Stage Heads) always wins; otherwise,
-  // check whether this specific subject has been granted to this user as
-  // a Department Head assignment.
   function canManageSubject(subjectId) {
     return canRestore || deptHeadSubjectIds.has(subjectId)
   }
@@ -45,6 +43,7 @@ function CurriculaSection({ subjects, userId, canManageSubject }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(null)
+  const [busyAction, setBusyAction] = useState(null) // e.g. "curriculumId-docx"
 
   async function loadCurricula() {
     setLoading(true)
@@ -59,6 +58,17 @@ function CurriculaSection({ subjects, userId, canManageSubject }) {
   }
 
   useEffect(() => { loadCurricula() }, [subjects])
+
+  async function handleExport(curriculumId, format) {
+    setBusyAction(`${curriculumId}-${format}`)
+    setError(null)
+    try {
+      await downloadFromEdgeFunction('export-document', { table: 'curricula', record_id: curriculumId, format }, `curriculum.${format}`)
+    } catch (err) {
+      setError(err.message)
+    }
+    setBusyAction(null)
+  }
 
   if (editing) {
     const manage = canManageSubject(editing.subjectId)
@@ -94,11 +104,27 @@ function CurriculaSection({ subjects, userId, canManageSubject }) {
           </div>
 
           {curricula.filter(c => c.subject_id === subject.id).map(c => (
-            <div key={c.id} className="curriculum-row">
+            <div key={c.id} className="curriculum-row plan-row">
               <span>{c.title} {c.academic_year ? `— ${c.academic_year}` : ''}</span>
-              <button onClick={() => setEditing({ subjectId: subject.id, curriculum: c })} className="secondary">
-                Open
-              </button>
+              <div className="plan-row-actions">
+                <button
+                  onClick={() => handleExport(c.id, 'docx')}
+                  disabled={busyAction === `${c.id}-docx`}
+                  className="secondary"
+                >
+                  {busyAction === `${c.id}-docx` ? 'Preparing…' : 'Word'}
+                </button>
+                <button
+                  onClick={() => handleExport(c.id, 'pdf')}
+                  disabled={busyAction === `${c.id}-pdf`}
+                  className="secondary"
+                >
+                  {busyAction === `${c.id}-pdf` ? 'Preparing…' : 'PDF'}
+                </button>
+                <button onClick={() => setEditing({ subjectId: subject.id, curriculum: c })} className="secondary">
+                  Open
+                </button>
+              </div>
             </div>
           ))}
 
