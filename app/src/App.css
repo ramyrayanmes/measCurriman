@@ -545,3 +545,23 @@ button.secondary {
   display: flex;
   gap: 0.4rem;
 }
+/* Append to the BOTTOM of App.css */
+
+.bulk-upload-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bulk-results {
+  margin-top: 1rem;
+}
+
+.bulk-results .temp-password-value {
+  font-family: monospace;
+  font-size: 0.85rem;
+  background: #fefce8;
+  border: 1px solid #fde047;
+  border-radius: 3px;
+  padding: 0.1rem 0.4rem;
+}

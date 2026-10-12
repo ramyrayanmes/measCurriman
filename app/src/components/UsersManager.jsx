@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { callEdgeFunctionJson } from '../edgeFunctions'
 import { roleLabel } from '../stageUtils'
+import BulkUserUpload from './BulkUserUpload'
 
 const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_kindergarten', 'head_elementary', 'head_middle', 'head_high']
 
@@ -99,6 +100,8 @@ export default function UsersManager() {
     <div>
       <h2>Users</h2>
 
+      <BulkUserUpload onDone={loadAll} />
+
       <div className="user-card">
         <h3>Create new user</h3>
         <form onSubmit={handleCreateUser} className="inline-form">
@@ -164,7 +167,6 @@ export default function UsersManager() {
               <p className="muted">Automatic access to all subjects in their stage — no manual assignment needed.</p>
             )}
 
-            {/* Department Head is independent of primary role — anyone can hold it */}
             <div className="subject-checkboxes dept-head-row">
               <span className="muted">Department Head of:</span>
               {subjects.map(s => {
