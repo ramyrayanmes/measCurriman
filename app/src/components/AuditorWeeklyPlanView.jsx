@@ -50,6 +50,7 @@ export default function AuditorWeeklyPlanView({ plan, onBack }) {
         recordId={plan.id}
         canRestore={false}
         canManageVersions={false}
+        pdfOnly={true}
       />
     </div>
   )

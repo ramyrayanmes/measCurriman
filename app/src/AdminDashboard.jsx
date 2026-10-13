@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient'
 import SubjectsManager from './components/SubjectsManager'
 import UsersManager from './components/UsersManager'
 import ContentManager from './components/ContentManager'
+import ReportsPanel from './components/ReportsPanel'
 
 export default function AdminDashboard({ userId }) {
   const [tab, setTab] = useState('content')
@@ -14,11 +15,13 @@ export default function AdminDashboard({ userId }) {
         <button className={tab === 'content' ? 'active' : ''} onClick={() => setTab('content')}>Content</button>
         <button className={tab === 'subjects' ? 'active' : ''} onClick={() => setTab('subjects')}>Subjects</button>
         <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users</button>
+        <button className={tab === 'reports' ? 'active' : ''} onClick={() => setTab('reports')}>Reports</button>
       </nav>
       <div className="tab-content">
         {tab === 'content' && <AllContent userId={userId} />}
         {tab === 'subjects' && <SubjectsManager />}
         {tab === 'users' && <UsersManager />}
+        {tab === 'reports' && <ReportsPanel />}
       </div>
     </div>
   )

@@ -1,6 +1,13 @@
 // supabase/functions/export-document/index.ts
+//
+// POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "format": "docx" | "pdf" }
+//
+// Auditors: PDF only (enforced here, server-side). Every auditor PDF
+// download is logged to downloads_log and emailed (to the auditor and to
+// meas.curricula@mes.edu.eg) with what was downloaded and when.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   Table, TableRow, TableCell, WidthType,
@@ -13,6 +20,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Expose-Headers": "Content-Disposition",
 };
+
+const AUDIT_COPY_ADDRESS = "meas.curricula@mes.edu.eg";
 
 const BLOOMS_LABELS: Record<number, string> = {
   1: "Remembering", 2: "Understanding", 3: "Applying",
@@ -45,8 +54,28 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: corsHeaders });
+    }
+
+    const { data: profile } = await userClient
+      .from("profiles")
+      .select("role, email")
+      .eq("id", user.id)
+      .single();
+
+    const isAuditor = profile?.role === "auditor";
+    if (isAuditor && format !== "pdf") {
+      return new Response(
+        JSON.stringify({ error: "Auditors may only download PDFs" }),
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     let fileBytes: Uint8Array;
     let fileName: string;
+    let description: string;
 
     if (table === "curricula") {
       const { data: curriculum, error } = await userClient
@@ -60,6 +89,7 @@ Deno.serve(async (req) => {
       }
 
       fileName = `${curriculum.title.replace(/[^a-z0-9]+/gi, "_")}.${format}`;
+      description = `Curriculum "${curriculum.title}" (${curriculum.subjects?.name ?? "unknown subject"}, ${curriculum.academic_year ?? "no year"})`;
       fileBytes = format === "docx"
         ? await buildCurriculumDocx(curriculum)
         : await buildCurriculumPdf(curriculum);
@@ -83,9 +113,23 @@ Deno.serve(async (req) => {
 
       fileName = `WeeklyPlan_Wk${plan.week_number}_${plan.subjects?.name ?? "Subject"}.${format}`
         .replace(/[^a-z0-9._]+/gi, "_");
+      description = `Weekly lesson plan — Week ${plan.week_number} (Semester ${plan.semester}), ${plan.subjects?.name ?? "unknown subject"}, teacher: ${plan.profiles?.full_name ?? "unknown"}`;
       fileBytes = format === "docx"
         ? await buildWeeklyPlanDocx(plan, periods ?? [])
         : await buildWeeklyPlanPdf(plan, periods ?? []);
+    }
+
+    // Auditor downloads: log + notify. Logging/emailing problems are
+    // reported in the function logs but never block the download itself.
+    if (isAuditor) {
+      await logAndNotify({
+        userId: user.id,
+        userEmail: profile?.email ?? user.email ?? "",
+        table,
+        recordId: record_id,
+        description,
+        format,
+      });
     }
 
     return new Response(fileBytes, {
@@ -103,6 +147,65 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
   }
 });
+
+// ---------------- Auditor logging + notification ----------------
+
+async function logAndNotify(args: {
+  userId: string; userEmail: string; table: string; recordId: string; description: string; format: string;
+}) {
+  const adminClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+
+  const { error: logError } = await adminClient.from("downloads_log").insert({
+    user_id: args.userId,
+    user_email: args.userEmail,
+    record_table: args.table,
+    record_id: args.recordId,
+    record_description: args.description,
+    format: args.format,
+  });
+  if (logError) console.error("downloads_log insert failed:", logError);
+
+  try {
+    const timestamp = new Date().toLocaleString("en-GB", {
+      timeZone: "Africa/Cairo",
+      dateStyle: "full",
+      timeStyle: "medium",
+    });
+
+    const client = new SMTPClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: {
+          username: Deno.env.get("GMAIL_ADDRESS")!,
+          password: Deno.env.get("GMAIL_APP_PASSWORD")!,
+        },
+      },
+    });
+
+    const recipients = Array.from(new Set([args.userEmail, AUDIT_COPY_ADDRESS].filter(Boolean)));
+
+    await client.send({
+      from: Deno.env.get("GMAIL_ADDRESS")!,
+      to: recipients,
+      subject: "Curriculum Portal - document downloaded",
+      content:
+        `A document was downloaded from the Curriculum Portal.\n\n` +
+        `Downloaded by: ${args.userEmail}\n` +
+        `Document: ${args.description}\n` +
+        `Format: ${args.format.toUpperCase()}\n` +
+        `Date/time (Cairo): ${timestamp}\n`,
+    });
+
+    await client.close();
+  } catch (err) {
+    console.error("Download notification email failed:", err);
+  }
+}
 
 // ---------------- DOCX builders ----------------
 
@@ -195,16 +298,12 @@ async function buildCurriculumPdf(c: any): Promise<Uint8Array> {
   return await pdf.save();
 }
 
-// Real bordered table, landscape pages for width. Each period gets a main
-// row (the template's core columns) plus a second full-width row for the
-// longer free-text fields (materials, differentiation, reflection, etc.)
-// — mirroring the Word version's layout.
 async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const PAGE_W = 792, PAGE_H = 612; // Letter landscape
+  const PAGE_W = 792, PAGE_H = 612;
   const MARGIN = 40;
   const FONT_SIZE = 8;
   const LINE_H = FONT_SIZE + 3;
@@ -286,7 +385,6 @@ async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array
 
     ensureSpace(mainRowHeight + detailsHeight);
 
-    // Main row
     let x = MARGIN;
     for (let i = 0; i < columns.length; i++) {
       const col = columns[i];
@@ -298,7 +396,6 @@ async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array
     }
     y -= mainRowHeight;
 
-    // Details row (full width)
     page.drawRectangle({ x: MARGIN, y: y - detailsHeight, width: tableWidth, height: detailsHeight, borderColor: rgb(0, 0, 0), borderWidth: 0.75 });
     detailsLines.forEach((line, li) => {
       page.drawText(line, { x: MARGIN + CELL_PAD, y: y - CELL_PAD - FONT_SIZE - li * LINE_H, size: FONT_SIZE, font });

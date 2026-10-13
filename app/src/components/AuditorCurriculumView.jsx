@@ -18,6 +18,8 @@ export default function AuditorCurriculumView({ curriculum, onBack }) {
         table="curricula"
         recordId={curriculum.id}
         canRestore={false}
+        canManageVersions={false}
+        pdfOnly={true}
       />
     </div>
   )

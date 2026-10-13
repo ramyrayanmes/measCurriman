@@ -5,7 +5,14 @@ import { callEdgeFunctionJson, downloadFromEdgeFunction } from '../edgeFunctions
 import SnapshotView from './SnapshotView'
 import CompareView from './CompareView'
 
-export default function VersionHistoryAndExport({ table, recordId, canRestore, canManageVersions, onRestored }) {
+export default function VersionHistoryAndExport({
+  table,
+  recordId,
+  canRestore,
+  canManageVersions,
+  pdfOnly,
+  onRestored,
+}) {
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,8 +20,8 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
   const [editingVersionId, setEditingVersionId] = useState(null)
   const [editName, setEditName] = useState('')
   const [editNotes, setEditNotes] = useState('')
-  const [previewing, setPreviewing] = useState(null) // version object
-  const [comparing, setComparing] = useState(null) // version object
+  const [previewing, setPreviewing] = useState(null)
+  const [comparing, setComparing] = useState(null)
   const [currentSnapshot, setCurrentSnapshot] = useState(null)
 
   const versionsView = table === 'curricula' ? 'curriculum_versions_secure' : 'weekly_plan_versions_secure'
@@ -89,7 +96,7 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
     loadVersions()
   }
 
-  async function handlePreview(v) {
+  function handlePreview(v) {
     setPreviewing(previewing?.id === v.id ? null : v)
     setComparing(null)
   }
@@ -107,9 +114,11 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
   return (
     <div className="version-panel">
       <div className="export-buttons">
-        <button onClick={() => handleExport('docx')} disabled={busyAction === 'docx'}>
-          {busyAction === 'docx' ? 'Preparing…' : 'Download Word'}
-        </button>
+        {!pdfOnly && (
+          <button onClick={() => handleExport('docx')} disabled={busyAction === 'docx'}>
+            {busyAction === 'docx' ? 'Preparing…' : 'Download Word'}
+          </button>
+        )}
         <button onClick={() => handleExport('pdf')} disabled={busyAction === 'pdf'}>
           {busyAction === 'pdf' ? 'Preparing…' : 'Download PDF'}
         </button>
@@ -156,27 +165,46 @@ export default function VersionHistoryAndExport({ table, recordId, canRestore, c
                       <button onClick={() => handlePreview(v)} className="secondary">
                         {previewing?.id === v.id ? 'Hide preview' : 'Preview'}
                       </button>
-                      <button onClick={() => handleCompare(v)} className="secondary" disabled={busyAction === `compare-${v.id}`}>
-                        {busyAction === `compare-${v.id}` ? 'Loading…' : comparing?.id === v.id ? 'Hide compare' : 'Compare to current'}
+                      <button
+                        onClick={() => handleCompare(v)}
+                        className="secondary"
+                        disabled={busyAction === `compare-${v.id}`}
+                      >
+                        {busyAction === `compare-${v.id}`
+                          ? 'Loading…'
+                          : comparing?.id === v.id ? 'Hide compare' : 'Compare to current'}
                       </button>
                       {canManageVersions && (
                         <button onClick={() => startEditing(v)} className="secondary">Name / Notes</button>
                       )}
                       {canRestore && (
-                        <button onClick={() => handleRestore(v.version_number)} disabled={busyAction === `restore-${v.version_number}`} className="secondary">
+                        <button
+                          onClick={() => handleRestore(v.version_number)}
+                          disabled={busyAction === `restore-${v.version_number}`}
+                          className="secondary"
+                        >
                           {busyAction === `restore-${v.version_number}` ? 'Restoring…' : 'Restore'}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {previewing?.id === v.id && ( <div className="preview-panel panel-with-close"> <button className="close-x" onClick={() => setPreviewing(null)} aria-label="Close">×</button> <h5>Preview — v{v.version_number}</h5> <SnapshotView table={table} snapshot={v.snapshot} /> </div>
+                  {previewing?.id === v.id && (
+                    <div className="preview-panel panel-with-close">
+                      <button className="close-x" onClick={() => setPreviewing(null)} aria-label="Close">×</button>
+                      <h5>Preview — v{v.version_number}</h5>
+                      <SnapshotView table={table} snapshot={v.snapshot} />
+                    </div>
                   )}
 
                   {comparing?.id === v.id && currentSnapshot && (
                     <CompareView
-                      table={table} oldSnapshot={v.snapshot} newSnapshot={currentSnapshot} oldLabel={`v${v.version_number}${v.name ? ' — ' + v.name : ''}`} newLabel="Current" onClose={() => setComparing(null)}
+                      table={table}
+                      oldSnapshot={v.snapshot}
+                      newSnapshot={currentSnapshot}
+                      oldLabel={`v${v.version_number}${v.name ? ' — ' + v.name : ''}`}
                       newLabel="Current"
+                      onClose={() => setComparing(null)}
                     />
                   )}
                 </>
