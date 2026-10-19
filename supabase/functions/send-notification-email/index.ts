@@ -60,8 +60,8 @@ Deno.serve(async (req) => {
     await client.send({
       from: Deno.env.get("GMAIL_ADDRESS")!,
       to: recipientEmail,
-      subject: notification.title,
-      content: `${notification.message}\n\nWhat changed:\n${diffText}`,
+      subject: `CurriMan: ${notification.title}`,
+      content: `CurriMan notification\n\n${notification.message}\n\nWhat changed:\n${diffText}\n\n-- CurriMan, Modern Education American School`,
     });
 
     await client.close();

@@ -8,9 +8,15 @@ import NotificationsPanel from './components/NotificationsPanel'
 import ChangePasswordPanel from './components/ChangePasswordPanel'
 import StageHeadDashboard from './StageHeadDashboard'
 import { roleLabel } from './stageUtils'
+import Brand from './components/Brand'
+import { APP_NAME, APP_VERSION, SCHOOL_NAME } from './version'
 import './App.css'
 
 export default function App() {
+  useEffect(() => {
+    document.title = `${APP_NAME} v${APP_VERSION} — MEAS`
+  }, [])
+
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -69,7 +75,9 @@ function Login() {
 
   return (
     <div className="login-container">
-      <h1>Curriculum Portal</h1>
+      <img src="/meas-logo-small.png" alt="MEAS" className="login-logo" />
+      <h1 className="login-title"><Brand /></h1>
+      <p className="login-sub">{SCHOOL_NAME}</p>
       <form onSubmit={handleSubmit} className="login-form">
         <label>
           Email
@@ -94,7 +102,7 @@ function Dashboard({ session, profile }) {
   return (
     <div className="dashboard-shell">
       <header className="top-bar">
-        <h1>Curriculum Portal</h1>
+        <h1><Brand /></h1>
         <div className="top-bar-user">
           {profile?.role === 'admin' && <NotificationsPanel userId={session.user.id} />}
           <span>{profile?.full_name ?? session.user.email} ({profile?.role ? roleLabel(profile.role) : '…'})</span>

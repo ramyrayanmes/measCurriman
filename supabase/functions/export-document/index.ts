@@ -192,9 +192,9 @@ async function logAndNotify(args: {
     await client.send({
       from: Deno.env.get("GMAIL_ADDRESS")!,
       to: recipients,
-      subject: "Curriculum Portal - document downloaded",
+      subject: "CurriMan - document downloaded",
       content:
-        `A document was downloaded from the Curriculum Portal.\n\n` +
+        `A document was downloaded from CurriMan.\n\n` +
         `Downloaded by: ${args.userEmail}\n` +
         `Document: ${args.description}\n` +
         `Format: ${args.format.toUpperCase()}\n` +

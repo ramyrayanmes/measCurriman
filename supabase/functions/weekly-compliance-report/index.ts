@@ -226,9 +226,10 @@ function renderSubjectText(r: any, showHeads: boolean): string {
 
 function planEmails(reports: any[], weekStart: string, weekEnd: string) {
   const label = `${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`;
-  const subject = `Weekly plan submissions: ${shortRange(weekStart, weekEnd)}`;
+  const subject = `CurriMan weekly report: ${shortRange(weekStart, weekEnd)}`;
   const wrap = (intro: string, body: string) =>
     `<div style="font-family:Arial,sans-serif">
+       <p style="margin:0;font-size:13px;font-weight:bold;color:#1a56db">CurriMan</p>
        <h2 style="margin-bottom:4px">Weekly lesson plan submission report</h2>
        <p style="color:#666;margin-top:0">${esc(label)} (Sunday–Thursday). ${esc(intro)}</p>
        ${body}
@@ -252,7 +253,7 @@ function planEmails(reports: any[], weekStart: string, weekEnd: string) {
       subject,
       subjects_count: h.reports.length,
       html: wrap("Here is the submission status for the subject(s) you head.", h.reports.map(r => renderSubjectHtml(r, false)).join("")),
-      text: `Weekly lesson plan submissions — ${label}\n\n` + h.reports.map(r => renderSubjectText(r, false)).join("\n\n"),
+      text: `CurriMan - Weekly lesson plan submissions — ${label}\n\n` + h.reports.map(r => renderSubjectText(r, false)).join("\n\n"),
     });
   }
 
@@ -263,7 +264,7 @@ function planEmails(reports: any[], weekStart: string, weekEnd: string) {
       subject: `${subject} (all subjects)`,
       subjects_count: reports.length,
       html: wrap("Consolidated report for all subjects.", reports.map(r => renderSubjectHtml(r, true)).join("")),
-      text: `Weekly lesson plan submissions — ${label} (all subjects)\n\n` + reports.map(r => renderSubjectText(r, true)).join("\n\n"),
+      text: `CurriMan - Weekly lesson plan submissions — ${label} (all subjects)\n\n` + reports.map(r => renderSubjectText(r, true)).join("\n\n"),
     });
   }
 

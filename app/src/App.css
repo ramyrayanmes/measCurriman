@@ -565,3 +565,66 @@ button.secondary {
   border-radius: 3px;
   padding: 0.1rem 0.4rem;
 }
+/* Append to the BOTTOM of App.css */
+
+/* ---- CurriMan brand ---- */
+.brand {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #0f1923;
+  white-space: nowrap;
+}
+
+.brand-curri {
+  color: #1a56db;
+  font-weight: 700;
+}
+
+.brand-man {
+  color: #0f1923;
+}
+
+.brand-on-dark .brand-curri { color: #6c9fff; }
+.brand-on-dark .brand-man { color: #ffffff; }
+
+.brand-ver {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-left: 6px;
+  letter-spacing: 0.3px;
+}
+
+.top-bar h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+/* ---- Login page ---- */
+.login-logo {
+  display: block;
+  width: 110px;
+  height: auto;
+  margin: 0 auto 0.5rem;
+}
+
+.login-container .login-title {
+  text-align: center;
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+}
+
+.login-container .login-title .brand {
+  font-size: 2.6rem;
+}
+
+.login-sub {
+  text-align: center;
+  color: #6b7f8f;
+  font-size: 0.9rem;
+  margin: 0 0 1.75rem;
+}
