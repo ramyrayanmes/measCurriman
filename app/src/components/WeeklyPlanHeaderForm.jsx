@@ -2,12 +2,12 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 
-export default function WeeklyPlanHeaderForm({ subjectId, existing, userId, onSaved, onCancel }) {
+export default function WeeklyPlanHeaderForm({ courseId, defaultGradeLevel, existing, userId, onSaved, onCancel }) {
   const [semester, setSemester] = useState(existing?.semester ?? 1)
   const [weekNumber, setWeekNumber] = useState(existing?.week_number ?? '')
   const [dateFrom, setDateFrom] = useState(existing?.date_from ?? '')
   const [dateTo, setDateTo] = useState(existing?.date_to ?? '')
-  const [gradeLevel, setGradeLevel] = useState(existing?.grade_level ?? '')
+  const [gradeLevel, setGradeLevel] = useState(existing?.grade_level ?? defaultGradeLevel ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -17,7 +17,7 @@ export default function WeeklyPlanHeaderForm({ subjectId, existing, userId, onSa
     setError(null)
 
     const payload = {
-      subject_id: subjectId,
+      course_id: courseId,
       teacher_id: userId,
       semester: Number(semester),
       week_number: Number(weekNumber),
@@ -64,8 +64,8 @@ export default function WeeklyPlanHeaderForm({ subjectId, existing, userId, onSa
       {error && <p className="error">{error}</p>}
 
       <div className="form-actions">
-        <button type="submit" disabled={saving}>{saving ? 'Saving…' : existing ? 'Save week details' : 'Create week'}</button>
-        <button type="button" onClick={onCancel} className="secondary">Cancel</button>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : existing ? 'Save week details' : 'Create week'}</button>
+        <button type="button" onClick={onCancel} className="btn btn-ghost">Cancel</button>
       </div>
     </form>
   )

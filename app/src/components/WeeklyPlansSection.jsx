@@ -4,27 +4,29 @@ import { supabase } from '../supabaseClient'
 import WeeklyPlanEditor from './WeeklyPlanEditor'
 import { downloadFromEdgeFunction } from '../edgeFunctions'
 
-export default function WeeklyPlansSection({ subjects, userId, canManageSubject }) {
+export default function WeeklyPlansSection({ course, gradeName, userId, isAdmin, canEdit }) {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [editing, setEditing] = useState(null)
+  const [editing, setEditing] = useState(null) // { plan } — plan null means "new"
   const [busyAction, setBusyAction] = useState(null) // e.g. "planId-docx"
+  const [reloadTick, setReloadTick] = useState(0)
 
-  async function loadPlans() {
-    setLoading(true)
-    if (subjects.length === 0) { setPlans([]); setLoading(false); return }
-    const { data, error } = await supabase
+  useEffect(() => {
+    let cancelled = false
+    supabase
       .from('weekly_plans')
-      .select('*')
-      .in('subject_id', subjects.map(s => s.id))
-      .order('week_number', { ascending: false })
-    if (error) setError(error.message)
-    else setPlans(data)
-    setLoading(false)
-  }
-
-  useEffect(() => { loadPlans() }, [subjects])
+      .select('*, profiles(full_name)')
+      .eq('course_id', course.id)
+      .order('date_from', { ascending: false })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) setError(error.message)
+        else { setPlans(data); setError(null) }
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [course.id, reloadTick])
 
   async function handleExport(planId, format) {
     setBusyAction(`${planId}-${format}`)
@@ -38,63 +40,62 @@ export default function WeeklyPlansSection({ subjects, userId, canManageSubject 
   }
 
   if (editing) {
+    const plan = editing.plan
     return (
       <WeeklyPlanEditor
-        subjectId={editing.subjectId}
-        existingPlan={editing.plan}
+        courseId={course.id}
+        defaultGradeLevel={gradeName}
+        existingPlan={plan}
         userId={userId}
-        canRestore={canManageSubject(editing.subjectId)}
-        onBack={() => { setEditing(null); loadPlans() }}
+        readOnly={!canEdit || (plan && plan.teacher_id !== userId && !isAdmin)}
+        onBack={() => { setEditing(null); setReloadTick(t => t + 1) }}
       />
     )
   }
 
-  if (loading) return <p>Loading…</p>
+  if (loading) return <p className="muted">Loading…</p>
 
   return (
     <div>
-      <h2>Weekly Lesson Plans</h2>
+      <div className="section-title-row" style={{ marginTop: 0 }}>
+        <h3>Weekly Lesson Plans</h3>
+        {canEdit && (
+          <button className="btn btn-primary btn-sm" onClick={() => setEditing({ plan: null })}>+ New week</button>
+        )}
+      </div>
+
       {error && <p className="error">{error}</p>}
 
-      {subjects.map(subject => (
-        <div key={subject.id} className="subject-block">
-          <div className="subject-block-header">
-            <h3>{subject.name} {subject.grade_level ? `(Grade ${subject.grade_level})` : ''}</h3>
-            <button onClick={() => setEditing({ subjectId: subject.id, plan: null })}>
-              + New week
-            </button>
-          </div>
-
-          {plans.filter(p => p.subject_id === subject.id).map(p => (
-            <div key={p.id} className="curriculum-row plan-row">
-              <span>Week {p.week_number} (Sem {p.semester}) — {p.date_from} to {p.date_to}</span>
-              <div className="plan-row-actions">
-                <button
-                  onClick={() => handleExport(p.id, 'docx')}
-                  disabled={busyAction === `${p.id}-docx`}
-                  className="secondary"
-                >
-                  {busyAction === `${p.id}-docx` ? 'Preparing…' : 'Word'}
-                </button>
-                <button
-                  onClick={() => handleExport(p.id, 'pdf')}
-                  disabled={busyAction === `${p.id}-pdf`}
-                  className="secondary"
-                >
-                  {busyAction === `${p.id}-pdf` ? 'Preparing…' : 'PDF'}
-                </button>
-                <button onClick={() => setEditing({ subjectId: subject.id, plan: p })} className="secondary">
-                  Open
-                </button>
-              </div>
+      {plans.map(p => (
+        <div key={p.id} className="card plan-row">
+          <div>
+            <div className="plan-title">Week {p.week_number} <span className="chip">Sem {p.semester}</span></div>
+            <div className="muted">
+              {p.date_from} to {p.date_to}
+              {p.teacher_id !== userId && p.profiles?.full_name ? ` • ${p.profiles.full_name}` : ''}
             </div>
-          ))}
-
-          {plans.filter(p => p.subject_id === subject.id).length === 0 && (
-            <p className="muted">No weekly plans yet for this subject.</p>
-          )}
+          </div>
+          <div className="plan-row-actions">
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => handleExport(p.id, 'docx')}
+              disabled={busyAction === `${p.id}-docx`}
+            >
+              {busyAction === `${p.id}-docx` ? 'Preparing…' : 'Word'}
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => handleExport(p.id, 'pdf')}
+              disabled={busyAction === `${p.id}-pdf`}
+            >
+              {busyAction === `${p.id}-pdf` ? 'Preparing…' : 'PDF'}
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => setEditing({ plan: p })}>Open</button>
+          </div>
         </div>
       ))}
+
+      {plans.length === 0 && <p className="muted">No weekly plans yet for this course.</p>}
     </div>
   )
 }

@@ -6,23 +6,24 @@ export default function NotificationsPanel({ userId }) {
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [reloadTick, setReloadTick] = useState(0)
   const panelRef = useRef(null)
 
-  async function loadNotifications() {
-    setLoading(true)
-    const { data } = await supabase
+  useEffect(() => {
+    let cancelled = false
+    supabase
       .from('notifications')
       .select('*')
       .eq('recipient_id', userId)
       .order('created_at', { ascending: false })
       .limit(30)
-    setNotifications(data ?? [])
-    setLoading(false)
-  }
-
-  useEffect(() => { loadNotifications() }, [userId])
-
-  // Close the dropdown when clicking outside it
+      .then(({ data }) => {
+        if (cancelled) return
+        setNotifications(data ?? [])
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [userId, reloadTick])
   useEffect(() => {
     function handleClickOutside(e) {
       if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false)
@@ -32,22 +33,28 @@ export default function NotificationsPanel({ userId }) {
   }, [])
 
   async function markAsRead(id) {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    const read_at = new Date().toISOString()
+    await supabase.from('notifications').update({ read_at }).eq('id', id)
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at } : n))
   }
 
   async function markAllAsRead() {
-    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id)
+    const unreadIds = notifications.filter(n => !n.read_at).map(n => n.id)
     if (unreadIds.length === 0) return
-    await supabase.from('notifications').update({ is_read: true }).in('id', unreadIds)
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+    const read_at = new Date().toISOString()
+    await supabase.from('notifications').update({ read_at }).in('id', unreadIds)
+    setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? read_at })))
   }
 
-  const unreadCount = notifications.filter(n => !n.is_read).length
+  const unreadCount = notifications.filter(n => !n.read_at).length
 
   return (
     <div className="notifications-panel" ref={panelRef}>
-      <button className="bell-button" onClick={() => setOpen(o => !o)}>
+      <button
+        className="bell-button"
+        onClick={() => { setOpen(o => !o); if (!open) setReloadTick(t => t + 1) }}
+        aria-label="Notifications"
+      >
         🔔
         {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
       </button>
@@ -62,13 +69,13 @@ export default function NotificationsPanel({ userId }) {
           {loading ? <p className="muted">Loading…</p> : (
             <>
               {notifications.map(n => (
-                <div key={n.id} className={`notification-item ${n.is_read ? '' : 'unread'}`}>
+                <div key={n.id} className={`notification-item ${n.read_at ? '' : 'unread'}`}>
                   <div>
                     <strong>{n.title}</strong>
                     <p>{n.message}</p>
                     <span className="muted">{new Date(n.created_at).toLocaleString()}</span>
                   </div>
-                  {!n.is_read && (
+                  {!n.read_at && (
                     <button onClick={() => markAsRead(n.id)} className="link-button">Mark read</button>
                   )}
                 </div>

@@ -118,8 +118,8 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
       {error && <p className="error">{error}</p>}
 
       <div className="form-actions">
-        <button type="submit" disabled={saving}>{saving ? 'Saving…' : existing ? 'Save period' : 'Add period'}</button>
-        <button type="button" onClick={onCancel} className="secondary">Cancel</button>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Saving…' : existing ? 'Save period' : 'Add period'}</button>
+        <button type="button" onClick={onCancel} className="btn btn-ghost">Cancel</button>
       </div>
     </form>
   )

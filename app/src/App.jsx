@@ -1,13 +1,7 @@
 // src/App.jsx
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
-import AdminDashboard from './AdminDashboard'
-import TeacherDashboard from './TeacherDashboard'
-import AuditorDashboard from './AuditorDashboard'
-import NotificationsPanel from './components/NotificationsPanel'
-import ChangePasswordPanel from './components/ChangePasswordPanel'
-import StageHeadDashboard from './StageHeadDashboard'
-import { roleLabel } from './stageUtils'
+import Shell from './Shell'
 import Brand from './components/Brand'
 import { APP_NAME, APP_VERSION, SCHOOL_NAME } from './version'
 import './App.css'
@@ -18,7 +12,6 @@ export default function App() {
   }, [])
 
   const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,25 +27,31 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
+  const userId = session?.user?.id
+  const [loadedProfile, setLoadedProfile] = useState(null) // { userId, data, error }
+
   useEffect(() => {
-    if (!session) {
-      setProfile(null)
-      return
-    }
+    if (!userId) return
+    let cancelled = false
     supabase
       .from('profiles')
       .select('full_name, role, email')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single()
       .then(({ data, error }) => {
-        if (!error) setProfile(data)
+        if (!cancelled) setLoadedProfile({ userId, data, error: error?.message ?? null })
       })
-  }, [session])
+    return () => { cancelled = true }
+  }, [userId])
 
-  if (loading) return <p>Loading…</p>
+  const current = loadedProfile?.userId === userId ? loadedProfile : null
+  const profile = current?.data ?? null
+  const profileError = current?.error ?? null
+
+  if (loading) return <p className="loading-screen">Loading…</p>
 
   return session ? (
-    <Dashboard session={session} profile={profile} />
+    <ProfileGate session={session} profile={profile} profileError={profileError} />
   ) : (
     <Login />
   )
@@ -94,30 +93,21 @@ function Login() {
   )
 }
 
-function Dashboard({ session, profile }) {
-  async function handleSignOut() {
-    await supabase.auth.signOut()
-  }
+function ProfileGate({ session, profile, profileError }) {
+  if (profile) return <Shell session={session} profile={profile} />
 
   return (
-    <div className="dashboard-shell">
-      <header className="top-bar">
-        <h1><Brand /></h1>
-        <div className="top-bar-user">
-          {profile?.role === 'admin' && <NotificationsPanel userId={session.user.id} />}
-          <span>{profile?.full_name ?? session.user.email} ({profile?.role ? roleLabel(profile.role) : '…'})</span>
-          <ChangePasswordPanel />
-          <button onClick={handleSignOut}>Sign out</button>
-        </div>
-      </header>
-
-      <main>
-        {profile?.role === 'admin' && <AdminDashboard userId={session.user.id} />}
-        {profile?.role === 'teacher' && <TeacherDashboard userId={session.user.id} />}
-        {profile?.role === 'auditor' && <AuditorDashboard userId={session.user.id} />}
-        {profile?.role?.startsWith('head_') && <StageHeadDashboard userId={session.user.id} role={profile.role} />}
-        {!profile && <p>Loading your profile…</p>}
-      </main>
+    <div className="welcome">
+      <span className="wi">{profileError ? '⚠️' : '⏳'}</span>
+      {profileError ? (
+        <>
+          <h2>Couldn't load your profile</h2>
+          <p className="error">{profileError}</p>
+          <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
+        </>
+      ) : (
+        <p>Loading your profile…</p>
+      )}
     </div>
   )
 }

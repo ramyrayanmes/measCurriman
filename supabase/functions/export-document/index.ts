@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
     } else {
       const { data: plan, error: planError } = await userClient
         .from("weekly_plans")
-        .select("*, subjects(name), profiles(full_name)")
+        .select("*, courses(name, departments(name), grades(name)), profiles(full_name)")
         .eq("id", record_id)
         .single();
 
@@ -111,9 +111,10 @@ Deno.serve(async (req) => {
         .eq("weekly_plan_id", record_id)
         .order("lesson_date", { ascending: true });
 
-      fileName = `WeeklyPlan_Wk${plan.week_number}_${plan.subjects?.name ?? "Subject"}.${format}`
+      const courseName = courseTitle(plan);
+      fileName = `WeeklyPlan_Wk${plan.week_number}_${courseName}.${format}`
         .replace(/[^a-z0-9._]+/gi, "_");
-      description = `Weekly lesson plan — Week ${plan.week_number} (Semester ${plan.semester}), ${plan.subjects?.name ?? "unknown subject"}, teacher: ${plan.profiles?.full_name ?? "unknown"}`;
+      description = `Weekly lesson plan — Week ${plan.week_number} (Semester ${plan.semester}), ${courseName}, teacher: ${plan.profiles?.full_name ?? "unknown"}`;
       fileBytes = format === "docx"
         ? await buildWeeklyPlanDocx(plan, periods ?? [])
         : await buildWeeklyPlanPdf(plan, periods ?? []);
@@ -149,6 +150,13 @@ Deno.serve(async (req) => {
 });
 
 // ---------------- Auditor logging + notification ----------------
+
+// "Department — Grade" for regular courses, or the elective's own name.
+function courseTitle(plan: any): string {
+  const c = plan.courses;
+  if (!c) return "Course";
+  return c.name ?? [c.departments?.name, c.grades?.name].filter(Boolean).join(" — ");
+}
 
 async function logAndNotify(args: {
   userId: string; userEmail: string; table: string; recordId: string; description: string; format: string;
@@ -231,7 +239,7 @@ async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Arra
   const children: Paragraph[] = [
     new Paragraph({ text: "Weekly Lesson Plan", heading: HeadingLevel.TITLE }),
     new Paragraph({ text: `Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}` }),
-    new Paragraph({ text: `Subject: ${plan.subjects?.name ?? ""}   Teacher: ${plan.profiles?.full_name ?? ""}` }),
+    new Paragraph({ text: `Course: ${courseTitle(plan)}   Teacher: ${plan.profiles?.full_name ?? ""}` }),
     new Paragraph({ text: `Date: ${plan.date_from} to ${plan.date_to}` }),
     new Paragraph({ text: "" }),
   ];
@@ -326,7 +334,7 @@ async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array
     page.drawText("Weekly Lesson Plan", { x: MARGIN, y, size: 16, font: bold });
     y -= 20;
     page.drawText(
-      `Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}   Subject: ${plan.subjects?.name ?? ""}   Teacher: ${plan.profiles?.full_name ?? ""}`,
+      `Semester: ${plan.semester}   Week: ${plan.week_number}   Grade: ${plan.grade_level ?? ""}   Course: ${courseTitle(plan)}   Teacher: ${plan.profiles?.full_name ?? ""}`,
       { x: MARGIN, y, size: 10, font }
     );
     y -= 14;
