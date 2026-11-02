@@ -5,7 +5,7 @@
 -- ------------------------------------------------------------ access helpers
 create or replace function public.my_role()
 returns text language sql stable security definer set search_path = public as $$
-  select role from public.profiles where id = auth.uid()
+  select role::text from public.profiles where id = auth.uid()
 $$;
 
 create or replace function public.is_admin()
@@ -20,7 +20,7 @@ returns boolean language sql stable security definer set search_path = public as
     or exists (
       select 1 from public.courses c
       join public.profiles p on p.id = auth.uid()
-      where c.id = p_course and p.role = 'head_' || c.stage
+      where c.id = p_course and p.role::text = 'head_' || c.stage
     )
     or exists (
       select 1 from public.course_assignments a
@@ -51,8 +51,8 @@ $$;
 create or replace function public.course_reviewer_ids(p_course uuid)
 returns setof uuid language sql stable security definer set search_path = public as $$
   select p.id from public.profiles p
-   where p.role = 'admin'
-      or p.role = 'head_' || (select stage from public.courses where id = p_course)
+   where p.role::text = 'admin'
+      or p.role::text = 'head_' || (select stage from public.courses where id = p_course)
   union
   select a.user_id from public.course_assignments a
    where a.course_id = p_course and a.kind = 'dept_head'
