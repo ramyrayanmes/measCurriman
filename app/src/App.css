@@ -296,6 +296,15 @@
 .notification-item.unread { background: var(--accent-light); }
 .notification-item p { color: var(--ink2); margin: 2px 0; }
 
+/* ---------- Users ---------- */
+.bulk-upload-header { display: flex; justify-content: space-between; align-items: center; }
+.user-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.user-filter { border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; background: var(--surface); min-width: 240px; }
+.assign-editor { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.assign-pill { gap: 8px !important; }
+.temp-password-box { margin-top: 12px; padding: 12px 14px; background: var(--accent-light); border: 1px solid #bfdbfe; border-radius: 8px; font-size: 0.85rem; }
+.temp-password-value { font-family: ui-monospace, Consolas, monospace; font-size: 1rem; font-weight: 600; margin: 6px 0; user-select: all; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .header-brand { min-width: 0; padding: 0 14px; }

@@ -56,17 +56,17 @@ export default function BulkUserUpload({ onDone }) {
   const skippedCount = results?.filter(r => r.status === 'skipped').length ?? 0
 
   return (
-    <div className="user-card">
+    <div className="card">
       <div className="bulk-upload-header">
         <h3>Bulk upload (CSV)</h3>
-        <button onClick={() => setOpen(o => !o)} className="secondary">
+        <button onClick={() => setOpen(o => !o)} className="btn btn-ghost btn-sm">
           {open ? 'Hide' : 'Show'}
         </button>
       </div>
 
       {open && (
         <div>
-          <button onClick={downloadUserTemplate} className="secondary">Download CSV template</button>
+          <button onClick={downloadUserTemplate} className="btn btn-ghost btn-sm">Download CSV template</button>
           <div className="inline-form" style={{ marginTop: '0.75rem' }}>
             <input type="file" accept=".csv" onChange={handleFileChange} disabled={parsing || uploading} />
           </div>
@@ -79,7 +79,7 @@ export default function BulkUserUpload({ onDone }) {
               <p>
                 <strong>{createdCount}</strong> created, <strong>{updatedCount}</strong> updated, <strong>{skippedCount}</strong> skipped.
               </p>
-              <table className="data-table">
+              <table className="tbl">
                 <thead>
                   <tr><th>Row</th><th>Email</th><th>Status</th><th>Details</th></tr>
                 </thead>

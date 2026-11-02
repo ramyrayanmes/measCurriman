@@ -1,20 +1,22 @@
 // src/components/UsersManager.jsx
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
 import { callEdgeFunctionJson } from '../edgeFunctions'
 import { roleLabel } from '../stageUtils'
+import { courseLabel } from '../access'
 import BulkUserUpload from './BulkUserUpload'
 
 const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_kindergarten', 'head_elementary', 'head_middle', 'head_high']
+const KIND_LABELS = { teacher: 'Teacher', auditor: 'Auditor', dept_head: 'Department head' }
 
-export default function UsersManager() {
+export default function UsersManager({ departments, courses, grades }) {
   const [users, setUsers] = useState([])
-  const [subjects, setSubjects] = useState([])
-  const [teacherSubjects, setTeacherSubjects] = useState([])
-  const [auditorSubjects, setAuditorSubjects] = useState([])
-  const [deptHeadSubjects, setDeptHeadSubjects] = useState([])
+  const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reloadTick, setReloadTick] = useState(0)
+  const [filter, setFilter] = useState('')
+  const [openUserId, setOpenUserId] = useState(null)
 
   const [newEmail, setNewEmail] = useState('')
   const [newFullName, setNewFullName] = useState('')
@@ -23,25 +25,32 @@ export default function UsersManager() {
   const [createError, setCreateError] = useState(null)
   const [justCreated, setJustCreated] = useState(null)
 
-  async function loadAll() {
-    setLoading(true)
-    const [{ data: u, error: uErr }, { data: s }, { data: ts }, { data: as_ }, { data: dhs }] = await Promise.all([
-      supabase.from('profiles').select('*').order('full_name', { ascending: true }),
-      supabase.from('subjects').select('*').order('name', { ascending: true }),
-      supabase.from('teacher_subjects').select('*'),
-      supabase.from('auditor_subjects').select('*'),
-      supabase.from('department_head_subjects').select('*'),
-    ])
-    if (uErr) setError(uErr.message)
-    setUsers(u ?? [])
-    setSubjects(s ?? [])
-    setTeacherSubjects(ts ?? [])
-    setAuditorSubjects(as_ ?? [])
-    setDeptHeadSubjects(dhs ?? [])
-    setLoading(false)
-  }
+  const gradeById = useMemo(() => new Map(grades.map(g => [g.id, g])), [grades])
+  const deptById = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments])
+  const courseById = useMemo(() => new Map(courses.map(c => [c.id, c])), [courses])
+  const reload = () => setReloadTick(t => t + 1)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      supabase.from('profiles').select('id, full_name, email, role').order('full_name', { ascending: true }),
+      supabase.from('course_assignments').select('user_id, course_id, kind'),
+    ]).then(([u, a]) => {
+      if (cancelled) return
+      if (u.error || a.error) setError((u.error ?? a.error).message)
+      else setError(null)
+      setUsers(u.data ?? [])
+      setAssignments(a.data ?? [])
+      setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [reloadTick])
+
+  function fullCourseName(courseId) {
+    const c = courseById.get(courseId)
+    if (!c) return '(unknown course)'
+    return `${deptById.get(c.department_id)?.name ?? '?'} — ${courseLabel(c, gradeById)}`
+  }
 
   async function handleCreateUser(e) {
     e.preventDefault()
@@ -56,53 +65,53 @@ export default function UsersManager() {
       })
       setJustCreated({ email: result.email, temp_password: result.temp_password })
       setNewEmail(''); setNewFullName(''); setNewRole('teacher')
-      loadAll()
+      reload()
     } catch (err) {
       setCreateError(err.message)
     }
     setCreating(false)
   }
 
-  async function handleRoleChange(userId, newRole) {
-    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId)
+  async function handleRoleChange(userId, role) {
+    const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
     if (error) setError(error.message)
-    else loadAll()
+    else reload()
   }
 
-  async function toggleAssignment(role, userId, subjectId, isAssigned) {
-    const table = role === 'teacher' ? 'teacher_subjects' : 'auditor_subjects'
-    const idCol = role === 'teacher' ? 'teacher_id' : 'auditor_id'
-
-    if (isAssigned) {
-      const { error } = await supabase.from(table).delete().eq(idCol, userId).eq('subject_id', subjectId)
-      if (error) setError(error.message)
-    } else {
-      const { error } = await supabase.from(table).insert({ [idCol]: userId, subject_id: subjectId })
-      if (error) setError(error.message)
-    }
-    loadAll()
+  async function addAssignment(userId, courseId, kind) {
+    const { error } = await supabase.from('course_assignments').insert({ user_id: userId, course_id: courseId, kind })
+    if (error) setError(error.message)
+    else reload()
   }
 
-  async function toggleDeptHead(userId, subjectId, isAssigned) {
-    if (isAssigned) {
-      const { error } = await supabase.from('department_head_subjects').delete().eq('user_id', userId).eq('subject_id', subjectId)
-      if (error) setError(error.message)
-    } else {
-      const { error } = await supabase.from('department_head_subjects').insert({ user_id: userId, subject_id: subjectId })
-      if (error) setError(error.message)
-    }
-    loadAll()
+  async function removeAssignment(a) {
+    const { error } = await supabase.from('course_assignments').delete()
+      .eq('user_id', a.user_id).eq('course_id', a.course_id).eq('kind', a.kind)
+    if (error) setError(error.message)
+    else reload()
   }
 
-  if (loading) return <p>Loading…</p>
+  const q = filter.trim().toLowerCase()
+  const shown = users.filter(u =>
+    !q || (u.full_name ?? '').toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q)
+  )
+
+  if (loading) return <p className="muted">Loading…</p>
 
   return (
-    <div>
-      <h2>Users</h2>
+    <div className="cv-wrap">
+      <div className="cv-topbar">
+        <div>
+          <h2 className="cv-title">Users</h2>
+          <p className="cv-subtitle">Accounts, roles and department/grade assignments.</p>
+        </div>
+      </div>
 
-      <BulkUserUpload onDone={loadAll} />
+      {error && <p className="error">{error}</p>}
 
-      <div className="user-card">
+      <BulkUserUpload onDone={reload} />
+
+      <div className="card">
         <h3>Create new user</h3>
         <form onSubmit={handleCreateUser} className="inline-form">
           <input placeholder="Full name" value={newFullName} onChange={e => setNewFullName(e.target.value)} required />
@@ -110,83 +119,114 @@ export default function UsersManager() {
           <select value={newRole} onChange={e => setNewRole(e.target.value)}>
             {ALL_ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
           </select>
-          <button type="submit" disabled={creating}>{creating ? 'Creating…' : 'Create account'}</button>
+          <button type="submit" className="btn btn-primary btn-sm" disabled={creating}>{creating ? 'Creating…' : 'Create account'}</button>
         </form>
         {createError && <p className="error">{createError}</p>}
         {justCreated && (
           <div className="temp-password-box">
-            <strong>Account created.</strong> Share this temporary password with {justCreated.email} —
-            it will only be shown here once:
+            <strong>Account created.</strong> Share this temporary password with {justCreated.email} — it is only shown once:
             <div className="temp-password-value">{justCreated.temp_password}</div>
-            <span className="muted">They can change it themselves after logging in via the "Change password" option.</span>
+            <span className="muted">They can change it after signing in via “Change password”.</span>
           </div>
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
+      <div className="section-title-row">
+        <h3>All users ({users.length})</h3>
+        <input
+          className="user-filter"
+          type="search"
+          placeholder="Filter by name or email…"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+        />
+      </div>
 
-      {users.map(user => {
-        const assignedSubjectIds = (user.role === 'teacher' ? teacherSubjects : auditorSubjects)
-          .filter(row => (user.role === 'teacher' ? row.teacher_id : row.auditor_id) === user.id)
-          .map(row => row.subject_id)
-
-        const deptHeadSubjectIds = deptHeadSubjects
-          .filter(row => row.user_id === user.id)
-          .map(row => row.subject_id)
-
+      {shown.map(user => {
+        const mine = assignments.filter(a => a.user_id === user.id)
+        const open = openUserId === user.id
         return (
-          <div key={user.id} className="user-card">
+          <div key={user.id} className="card user-card">
             <div className="user-card-header">
-              <strong>{user.full_name}</strong> <span className="muted">({user.email})</span>
-              <select value={user.role} onChange={e => handleRoleChange(user.id, e.target.value)}>
-                {ALL_ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
-              </select>
-            </div>
-
-            {(user.role === 'teacher' || user.role === 'auditor') && (
-              <div className="subject-checkboxes">
-                <span className="muted">Assigned subjects ({user.role}):</span>
-                {subjects.map(s => {
-                  const isAssigned = assignedSubjectIds.includes(s.id)
-                  return (
-                    <label key={s.id} className="checkbox-pill">
-                      <input
-                        type="checkbox"
-                        checked={isAssigned}
-                        onChange={() => toggleAssignment(user.role, user.id, s.id, isAssigned)}
-                      />
-                      {s.name}
-                    </label>
-                  )
-                })}
-                {subjects.length === 0 && <span className="muted">No subjects created yet.</span>}
+              <div>
+                <strong>{user.full_name || '(no name)'}</strong> <span className="muted">{user.email}</span>
               </div>
-            )}
-
-            {user.role?.startsWith('head_') && (
-              <p className="muted">Automatic access to all subjects in their stage — no manual assignment needed.</p>
-            )}
-
-            <div className="subject-checkboxes dept-head-row">
-              <span className="muted">Department Head of:</span>
-              {subjects.map(s => {
-                const isHead = deptHeadSubjectIds.includes(s.id)
-                return (
-                  <label key={s.id} className="checkbox-pill">
-                    <input
-                      type="checkbox"
-                      checked={isHead}
-                      onChange={() => toggleDeptHead(user.id, s.id, isHead)}
-                    />
-                    {s.name}
-                  </label>
-                )
-              })}
-              {subjects.length === 0 && <span className="muted">No subjects created yet.</span>}
+              <div className="tbl-actions">
+                <select value={user.role} onChange={e => handleRoleChange(user.id, e.target.value)}>
+                  {ALL_ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
+                </select>
+                <button className="btn btn-ghost btn-sm" onClick={() => setOpenUserId(open ? null : user.id)}>
+                  {open ? 'Hide' : 'Assignments'} ({mine.length})
+                </button>
+              </div>
             </div>
+
+            {user.role.startsWith('head_') && (
+              <p className="muted">Reviews every course in their stage automatically. Add department-head assignments below only for courses outside it.</p>
+            )}
+            {user.role === 'admin' && <p className="muted">Admins have access to everything.</p>}
+
+            {open && (
+              <AssignmentEditor
+                user={user}
+                mine={mine}
+                departments={departments}
+                courses={courses}
+                gradeById={gradeById}
+                fullCourseName={fullCourseName}
+                onAdd={addAssignment}
+                onRemove={removeAssignment}
+              />
+            )}
           </div>
         )
       })}
+      {shown.length === 0 && <p className="muted">No users match.</p>}
+    </div>
+  )
+}
+
+function AssignmentEditor({ user, mine, departments, courses, gradeById, fullCourseName, onAdd, onRemove }) {
+  const defaultKind = user.role === 'auditor' ? 'auditor' : 'teacher'
+  const [kind, setKind] = useState(defaultKind)
+  const [deptId, setDeptId] = useState('')
+  const [courseId, setCourseId] = useState('')
+
+  const deptCourses = courses.filter(c => c.department_id === deptId && !c.archived_at)
+  const taken = new Set(mine.filter(a => a.kind === kind).map(a => a.course_id))
+
+  return (
+    <div className="assign-editor">
+      {mine.length === 0 && <p className="muted">No assignments yet.</p>}
+      <div className="subject-checkboxes">
+        {mine.map(a => (
+          <span key={`${a.course_id}-${a.kind}`} className="checkbox-pill assign-pill">
+            <span className="chip">{KIND_LABELS[a.kind]}</span>
+            {fullCourseName(a.course_id)}
+            <button className="link-button" onClick={() => onRemove(a)} aria-label="Remove">✕</button>
+          </span>
+        ))}
+      </div>
+
+      <form
+        className="inline-form"
+        onSubmit={e => { e.preventDefault(); onAdd(user.id, courseId, kind); setCourseId('') }}
+      >
+        <select value={kind} onChange={e => setKind(e.target.value)}>
+          {Object.entries(KIND_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </select>
+        <select value={deptId} onChange={e => { setDeptId(e.target.value); setCourseId('') }} required>
+          <option value="">Department…</option>
+          {departments.filter(d => !d.archived_at).map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+        </select>
+        <select value={courseId} onChange={e => setCourseId(e.target.value)} required disabled={!deptId}>
+          <option value="">Grade…</option>
+          {deptCourses.filter(c => !taken.has(c.id)).map(c => (
+            <option key={c.id} value={c.id}>{c.name ?? gradeById.get(c.grade_id)?.name}</option>
+          ))}
+        </select>
+        <button className="btn btn-primary btn-sm" disabled={!courseId}>Add</button>
+      </form>
     </div>
   )
 }

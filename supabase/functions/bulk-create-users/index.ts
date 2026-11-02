@@ -1,13 +1,14 @@
 // supabase/functions/bulk-create-users/index.ts
 //
-// POST body: { rows: [ { full_name, email, role, stage, subjects, department_head_of }, ... ] }
+// POST body: { rows: [ { full_name, email, role, stage, courses, department_head_of }, ... ] }
 // - role: "admin" | "teacher" | "auditor" | "head"
 // - stage: "kindergarten" | "elementary" | "middle" | "high" — required only when role is "head"
-// - subjects: semicolon-separated subject names (teacher/auditor access)
-// - department_head_of: semicolon-separated subject names (independent grant, any role)
+// - courses: semicolon-separated "Department/Grade" pairs (teacher/auditor access),
+//   e.g. "English/Grade 2;Math/Grade 3". Electives use "Department/Elective name".
+// - department_head_of: semicolon-separated "Department/Grade" pairs (any role)
 //
 // Existing users (matched by email) are UPDATED (name, role, and their
-// subject/department-head lists are fully replaced by what's in the row).
+// course assignments are fully replaced by what's in the row).
 // New users are CREATED with a random temp password. A row that fails
 // validation is skipped — the rest of the file still processes — and
 // every row's outcome is returned in the results summary.
@@ -93,15 +94,24 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Build a name → id lookup for subjects, once.
-    const { data: subjects } = await adminClient.from("subjects").select("id, name");
-    const subjectIdByName = new Map((subjects ?? []).map(s => [s.name.trim().toLowerCase(), s.id]));
+    // Build "department/grade" -> course id lookup, once. Electives use "department/elective name".
+    const [{ data: depts }, { data: grades }, { data: courses }] = await Promise.all([
+      adminClient.from("departments").select("id, name"),
+      adminClient.from("grades").select("id, name"),
+      adminClient.from("courses").select("id, department_id, grade_id, name"),
+    ]);
+    const deptName = new Map((depts ?? []).map(d => [d.id, d.name]));
+    const gradeName = new Map((grades ?? []).map(g => [g.id, g.name]));
+    const courseIdByKey = new Map((courses ?? []).map(c => [
+      `${deptName.get(c.department_id) ?? ""}/${c.name ?? gradeName.get(c.grade_id) ?? ""}`.trim().toLowerCase(),
+      c.id,
+    ]));
 
-    function resolveSubjectIds(names: string[]): string[] {
+    function resolveCourseIds(names: string[]): string[] {
       const ids: string[] = [];
       for (const name of names) {
-        const id = subjectIdByName.get(name.toLowerCase());
-        if (!id) throw new Error(`Unknown subject "${name}"`);
+        const id = courseIdByKey.get(name.toLowerCase().replace(/\s*\/\s*/g, "/"));
+        if (!id) throw new Error(`Unknown course "${name}" (use Department/Grade, e.g. English/Grade 2)`);
         ids.push(id);
       }
       return ids;
@@ -119,10 +129,8 @@ Deno.serve(async (req) => {
         if (!fullName || !email) throw new Error("full_name and email are required");
 
         const role = resolveRole(row.role, row.stage);
-        const subjectNames = splitNames(row.subjects);
-        const deptHeadNames = splitNames(row.department_head_of);
-        const subjectIds = resolveSubjectIds(subjectNames);
-        const deptHeadIds = resolveSubjectIds(deptHeadNames);
+        const courseIds = resolveCourseIds(splitNames(row.courses));
+        const deptHeadIds = resolveCourseIds(splitNames(row.department_head_of));
 
         // Does a user with this email already exist?
         const { data: existingProfile } = await adminClient
@@ -159,22 +167,17 @@ Deno.serve(async (req) => {
           status = "created";
         }
 
-        // Replace subject/department-head assignments with what's in this row.
-        if (role === "teacher") {
-          await adminClient.from("teacher_subjects").delete().eq("teacher_id", userId);
-          if (subjectIds.length > 0) {
-            await adminClient.from("teacher_subjects").insert(subjectIds.map(subject_id => ({ teacher_id: userId, subject_id })));
-          }
-        } else if (role === "auditor") {
-          await adminClient.from("auditor_subjects").delete().eq("auditor_id", userId);
-          if (subjectIds.length > 0) {
-            await adminClient.from("auditor_subjects").insert(subjectIds.map(subject_id => ({ auditor_id: userId, subject_id })));
-          }
-        }
-
-        await adminClient.from("department_head_subjects").delete().eq("user_id", userId);
-        if (deptHeadIds.length > 0) {
-          await adminClient.from("department_head_subjects").insert(deptHeadIds.map(subject_id => ({ user_id: userId, subject_id })));
+        // Replace course assignments with what's in this row.
+        await adminClient.from("course_assignments").delete().eq("user_id", userId);
+        const rowsToInsert = [
+          ...(role === "teacher" || role === "auditor"
+            ? courseIds.map(course_id => ({ user_id: userId, course_id, kind: role }))
+            : []),
+          ...deptHeadIds.map(course_id => ({ user_id: userId, course_id, kind: "dept_head" })),
+        ];
+        if (rowsToInsert.length > 0) {
+          const { error: assignError } = await adminClient.from("course_assignments").insert(rowsToInsert);
+          if (assignError) throw assignError;
         }
 
         results.push({ row: rowNum, email, status, temp_password: tempPassword });

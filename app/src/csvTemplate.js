@@ -1,11 +1,11 @@
 // src/csvTemplate.js
 
 export function downloadUserTemplate() {
-  const header = 'full_name,email,role,stage,subjects,department_head_of'
+  const header = 'full_name,email,role,stage,courses,department_head_of'
   const exampleRows = [
-    'Jane Smith,jane.smith@mes.edu.eg,teacher,,Mathematics;Physics,',
+    'Jane Smith,jane.smith@mes.edu.eg,teacher,,English/Grade 2;English/Grade 3,',
     'Ahmed Hassan,ahmed.hassan@mes.edu.eg,head,elementary,,',
-    'Sara Ali,sara.ali@mes.edu.eg,teacher,,English,English',
+    'Sara Ali,sara.ali@mes.edu.eg,teacher,,Math/Grade 4,Math/Grade 4',
   ]
   const csv = [header, ...exampleRows].join('\n')
 

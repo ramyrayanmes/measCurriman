@@ -5,6 +5,7 @@ import Brand from './components/Brand'
 import Sidebar from './components/Sidebar'
 import CoursePanel from './components/CoursePanel'
 import ManageDepartments from './components/ManageDepartments'
+import UsersManager from './components/UsersManager'
 import NotificationsPanel from './components/NotificationsPanel'
 import ChangePasswordPanel from './components/ChangePasswordPanel'
 import { roleLabel } from './stageUtils'
@@ -87,6 +88,11 @@ export default function Shell({ session, profile }) {
               ⚙ <span className="nav-label">Manage</span>
             </button>
           )}
+          {admin && (
+            <button className={`nav-tab admin-tab${view === 'users' ? ' active' : ''}`} onClick={() => setView('users')}>
+              👥 <span className="nav-label">Users</span>
+            </button>
+          )}
         </nav>
 
         <div className="header-right">
@@ -133,6 +139,10 @@ export default function Shell({ session, profile }) {
               courses={courses}
               onChanged={loadStructure}
             />
+          )}
+
+          {!loading && view === 'users' && admin && (
+            <UsersManager departments={departments} courses={courses} grades={grades} />
           )}
 
           {!loading && view === 'courses' && (
