@@ -95,15 +95,31 @@ Deno.serve(async (req) => {
         : await buildCurriculumPdf(curriculum);
 
     } else {
-      const { data: plan, error: planError } = await userClient
+      const { data: planRow, error: planError } = await userClient
         .from("weekly_plans")
-        .select("*, courses(name, departments(name), grades(name)), profiles(full_name)")
+        .select("*")
         .eq("id", record_id)
         .single();
 
-      if (planError || !plan) {
-        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404, headers: corsHeaders });
+      if (planError || !planRow) {
+        return new Response(
+          JSON.stringify({ error: `Plan not found or no access${planError ? `: ${planError.message}` : ""}` }),
+          { status: 404, headers: corsHeaders }
+        );
       }
+
+      // Related rows are fetched separately so one missing/blocked row can't hide the plan.
+      const { data: courseRow } = await userClient
+        .from("courses")
+        .select("name, departments(name), grades(name)")
+        .eq("id", planRow.course_id)
+        .maybeSingle();
+      const { data: teacherRow } = await userClient
+        .from("profiles")
+        .select("full_name")
+        .eq("id", planRow.teacher_id)
+        .maybeSingle();
+      const plan = { ...planRow, courses: courseRow, profiles: teacherRow };
 
       const { data: periods } = await userClient
         .from("lesson_periods")

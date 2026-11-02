@@ -9,6 +9,7 @@ import { useToast } from '../toastContext'
 
 const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_department', 'head_kindergarten', 'head_elementary', 'head_middle', 'head_high']
 const KIND_LABELS = { teacher: 'Teacher', auditor: 'Auditor', dept_head: 'Head of Department' }
+const ALL = '__all__'
 
 export default function UsersManager({ departments, courses, grades }) {
   const toast = useToast()
@@ -81,10 +82,12 @@ export default function UsersManager({ departments, courses, grades }) {
     else { toast('Role updated'); reload() }
   }
 
-  async function addAssignment(userId, courseId, kind) {
-    const { error } = await supabase.from('course_assignments').insert({ user_id: userId, course_id: courseId, kind })
+  async function addAssignment(userId, courseIds, kind) {
+    const ids = Array.isArray(courseIds) ? courseIds : [courseIds]
+    const { error } = await supabase.from('course_assignments')
+      .insert(ids.map(course_id => ({ user_id: userId, course_id, kind })))
     if (error) { setError(error.message); toast(error.message, 'error') }
-    else { toast('Assignment added'); reload() }
+    else { toast(ids.length > 1 ? `${ids.length} assignments added` : 'Assignment added'); reload() }
   }
 
   async function removeAssignment(a) {
@@ -214,8 +217,13 @@ function AssignmentEditor({ user, mine, departments, courses, gradeById, fullCou
   const deptCourses = courses.filter(c => c.department_id === deptId && !c.archived_at)
   const taken = new Set(mine.filter(a => a.kind === kind).map(a => a.course_id))
 
+  const available = deptCourses.filter(c => !taken.has(c.id))
+
   return (
     <div className="assign-editor">
+      <p className="muted">
+        A person can hold several assignments of different kinds, e.g. Teacher for English/Grade 2 and Head of Department for Math/Grade 4 to 6.
+      </p>
       {mine.length === 0 && <p className="muted">No assignments yet.</p>}
       <div className="subject-checkboxes">
         {mine.map(a => (
@@ -229,7 +237,11 @@ function AssignmentEditor({ user, mine, departments, courses, gradeById, fullCou
 
       <form
         className="inline-form"
-        onSubmit={e => { e.preventDefault(); onAdd(user.id, courseId, kind); setCourseId('') }}
+        onSubmit={e => {
+          e.preventDefault()
+          onAdd(user.id, courseId === ALL ? available.map(c => c.id) : courseId, kind)
+          setCourseId('')
+        }}
       >
         <select value={kind} onChange={e => setKind(e.target.value)}>
           {Object.entries(KIND_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
@@ -240,7 +252,8 @@ function AssignmentEditor({ user, mine, departments, courses, gradeById, fullCou
         </select>
         <select value={courseId} onChange={e => setCourseId(e.target.value)} required disabled={!deptId}>
           <option value="">Grade…</option>
-          {deptCourses.filter(c => !taken.has(c.id)).map(c => (
+          {available.length > 1 && <option value={ALL}>All grades ({available.length})</option>}
+          {available.map(c => (
             <option key={c.id} value={c.id}>{c.name ?? gradeById.get(c.grade_id)?.name}</option>
           ))}
         </select>

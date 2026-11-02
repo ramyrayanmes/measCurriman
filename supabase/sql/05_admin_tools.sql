@@ -2,13 +2,28 @@
 -- Head of Department role, permanent department deletion, and profile backfill.
 -- Safe to re-run.
 
--- 1. Head of Department is a role of its own; the departments/grades it oversees
---    are still granted through course_assignments (kind = 'dept_head').
+-- 1. Head of Department is a role of its own; the courses it oversees are still
+--    granted through course_assignments (kind = 'dept_head').
+--    The live profiles.role column is the enum user_role, so the value is added there.
+do $$
+begin
+  if exists (select 1 from pg_type where typname = 'user_role') then
+    alter type public.user_role add value if not exists 'head_department';
+  end if;
+end $$;
+
+-- A text check constraint (only present when role is plain text) must allow the new value too.
 alter table public.profiles drop constraint if exists profiles_role_check;
-alter table public.profiles add constraint profiles_role_check check (role in (
-  'admin', 'teacher', 'auditor', 'head_department',
-  'head_kindergarten', 'head_elementary', 'head_middle', 'head_high'
-));
+do $$
+begin
+  if (select data_type from information_schema.columns
+       where table_schema = 'public' and table_name = 'profiles' and column_name = 'role') = 'text' then
+    alter table public.profiles add constraint profiles_role_check check (role in (
+      'admin', 'teacher', 'auditor', 'head_department',
+      'head_kindergarten', 'head_elementary', 'head_middle', 'head_high'
+    ));
+  end if;
+end $$;
 
 -- 2. Permanently delete a department with all its courses and everything under them
 --    (curriculum versions, working copies, weekly plans, assignments, notifications).
