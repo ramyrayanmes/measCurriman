@@ -1,6 +1,7 @@
 // src/components/CoursePanel.jsx
 import { useState } from 'react'
 import WeeklyPlansSection from './WeeklyPlansSection'
+import CurriculumEditor from './CurriculumEditor'
 import { STAGE_LABELS } from '../stageUtils'
 import { courseLabel } from '../access'
 
@@ -32,11 +33,14 @@ export default function CoursePanel({ course, department, gradeById, userId, isA
       </div>
 
       {tab === 'curriculum' && (
-        <div className="card placeholder-card">
-          <span className="big">📘</span>
-          <h3>Curriculum editor coming soon</h3>
-          <p>The 13-section curriculum template and version workflow are built in the next phases.</p>
-        </div>
+        <CurriculumEditor
+          key={course.id}
+          course={course}
+          department={department}
+          grade={grade}
+          userId={userId}
+          canEdit={canEdit}
+        />
       )}
 
       {tab === 'plans' && (
