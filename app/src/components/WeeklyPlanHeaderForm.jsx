@@ -1,8 +1,10 @@
 // src/components/WeeklyPlanHeaderForm.jsx
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useToast } from '../toastContext'
 
 export default function WeeklyPlanHeaderForm({ courseId, defaultGradeLevel, existing, userId, onSaved, onCancel }) {
+  const toast = useToast()
   const [semester, setSemester] = useState(existing?.semester ?? 1)
   const [weekNumber, setWeekNumber] = useState(existing?.week_number ?? '')
   const [dateFrom, setDateFrom] = useState(existing?.date_from ?? '')
@@ -31,7 +33,8 @@ export default function WeeklyPlanHeaderForm({ courseId, defaultGradeLevel, exis
       : await supabase.from('weekly_plans').insert(payload).select().single()
 
     setSaving(false)
-    if (result.error) { setError(result.error.message); return }
+    if (result.error) { setError(result.error.message); toast(result.error.message, 'error'); return }
+    toast('Weekly plan saved')
     onSaved(result.data)
   }
 

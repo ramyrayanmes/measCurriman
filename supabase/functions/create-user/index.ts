@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const VALID_ROLES = [
-  "admin", "teacher", "auditor",
+  "admin", "teacher", "auditor", "head_department",
   "head_kindergarten", "head_elementary", "head_middle", "head_high",
 ];
 
@@ -33,9 +33,11 @@ Deno.serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization") ?? "";
-    const { email, full_name, role } = await req.json();
+    const body = await req.json();
+    const { email, full_name, role } = body;
+    const resetUserId: string | undefined = body.action === "reset_password" ? body.user_id : undefined;
 
-    if (!email || !full_name || !VALID_ROLES.includes(role)) {
+    if (!resetUserId && (!email || !full_name || !VALID_ROLES.includes(role))) {
       return new Response(
         JSON.stringify({ error: "Missing or invalid email/full_name/role" }),
         { status: 400, headers: corsHeaders }
@@ -70,6 +72,18 @@ Deno.serve(async (req) => {
 
     const tempPassword = generateTempPassword();
 
+    if (resetUserId) {
+      const { data: updated, error: resetError } = await adminClient.auth.admin.updateUserById(
+        resetUserId,
+        { password: tempPassword },
+      );
+      if (resetError) throw resetError;
+      return new Response(
+        JSON.stringify({ user_id: resetUserId, email: updated.user.email, temp_password: tempPassword }),
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password: tempPassword,
@@ -79,13 +93,11 @@ Deno.serve(async (req) => {
 
     if (createError) throw createError;
 
-    if (role !== "teacher") {
-      const { error: roleError } = await adminClient
-        .from("profiles")
-        .update({ role })
-        .eq("id", newUser.user.id);
-      if (roleError) throw roleError;
-    }
+    // Upsert so the profile exists even if the new-user trigger did not create it.
+    const { error: profileUpsertError } = await adminClient
+      .from("profiles")
+      .upsert({ id: newUser.user.id, email, full_name, role }, { onConflict: "id" });
+    if (profileUpsertError) throw profileUpsertError;
 
     return new Response(
       JSON.stringify({ user_id: newUser.user.id, email, temp_password: tempPassword }),

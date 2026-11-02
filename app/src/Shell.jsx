@@ -154,6 +154,7 @@ export default function Shell({ session, profile }) {
                 gradeById={gradeById}
                 userId={userId}
                 isAdmin={admin}
+                isAuditor={profile.role === 'auditor'}
                 reviewer={isReviewer(profile, assignments, course)}
                 canEdit={canEditCourse(profile, assignments, course)}
               />

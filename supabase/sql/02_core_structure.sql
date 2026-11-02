@@ -37,7 +37,7 @@ begin
 end $$;
 
 alter table public.profiles add constraint profiles_role_check check (role in (
-  'admin', 'teacher', 'auditor',
+  'admin', 'teacher', 'auditor', 'head_department',
   'head_kindergarten', 'head_elementary', 'head_middle', 'head_high'
 ));
 

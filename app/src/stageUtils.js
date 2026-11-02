@@ -30,6 +30,7 @@ export function roleLabel(role) {
     admin: 'Admin',
     teacher: 'Teacher',
     auditor: 'Auditor',
+    head_department: 'Head of Department',
     head_kindergarten: 'Head of Kindergarten',
     head_elementary: 'Head of Elementary',
     head_middle: 'Head of Middle School',

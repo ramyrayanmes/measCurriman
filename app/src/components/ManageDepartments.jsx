@@ -3,10 +3,12 @@ import { useState, useMemo } from 'react'
 import { supabase } from '../supabaseClient'
 import { STAGE_LABELS } from '../stageUtils'
 import { courseLabel } from '../access'
+import { useToast } from '../toastContext'
 
 const STAGES = Object.keys(STAGE_LABELS)
 
 export default function ManageDepartments({ grades, departments, courses, onChanged }) {
+  const toast = useToast()
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -14,12 +16,13 @@ export default function ManageDepartments({ grades, departments, courses, onChan
   const deptById = useMemo(() => new Map(departments.map(d => [d.id, d])), [departments])
 
   // Runs a Supabase write, reports errors, then refreshes the shell data.
-  async function run(request) {
+  async function run(request, successMessage = 'Changes saved') {
     setBusy(true)
     setError(null)
     const { error } = await request
     setBusy(false)
-    if (error) { setError(error.message); return false }
+    if (error) { setError(error.message); toast(error.message, 'error'); return false }
+    toast(successMessage)
     await onChanged()
     return true
   }
@@ -40,7 +43,7 @@ export default function ManageDepartments({ grades, departments, courses, onChan
       {error && <p className="error">{error}</p>}
 
       <DepartmentsSection
-        departments={departments} busy={busy} run={run} archiveToggle={archiveToggle}
+        departments={departments} courses={courses} busy={busy} run={run} archiveToggle={archiveToggle}
       />
       <GradesSection
         grades={grades} busy={busy} run={run} archiveToggle={archiveToggle}
@@ -54,10 +57,21 @@ export default function ManageDepartments({ grades, departments, courses, onChan
   )
 }
 
-function DepartmentsSection({ departments, busy, run, archiveToggle }) {
+function DepartmentsSection({ departments, courses, busy, run, archiveToggle }) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('📘')
   const [kind, setKind] = useState('department')
+
+  async function handleDelete(d) {
+    const count = courses.filter(c => c.department_id === d.id).length
+    const typed = window.prompt(
+      `PERMANENTLY delete "${d.name}"?\n\nThis also deletes its ${count} course(s) with all curriculum versions, ` +
+      `working copies, weekly plans and user assignments. This cannot be undone.\n\nType the department name to confirm:`
+    )
+    if (typed === null) return
+    if (typed.trim() !== d.name) { window.alert('The name did not match. Nothing was deleted.'); return }
+    await run(supabase.rpc('delete_department', { p_dept: d.id }), 'Department deleted')
+  }
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -92,6 +106,7 @@ function DepartmentsSection({ departments, busy, run, archiveToggle }) {
                     <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => archiveToggle('departments', d)}>
                       {d.archived_at ? 'Restore' : 'Archive'}
                     </button>
+                    <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => handleDelete(d)}>Delete</button>
                   </div>
                 </td>
               </tr>

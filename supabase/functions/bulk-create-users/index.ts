@@ -1,9 +1,10 @@
 // supabase/functions/bulk-create-users/index.ts
 //
 // POST body: { rows: [ { full_name, email, role, stage, courses, department_head_of }, ... ] }
-// - role: "admin" | "teacher" | "auditor" | "head"
-// - stage: "kindergarten" | "elementary" | "middle" | "high" — required only when role is "head"
-// - courses: semicolon-separated "Department/Grade" pairs (teacher/auditor access),
+// - role: "admin" | "teacher" | "auditor" | "head_department" | "head"
+// - stage: "kindergarten" | "elementary" | "middle" | "high" — required only when role is "head" (head of stage)
+// - courses: semicolon-separated "Department/Grade" pairs (teacher/auditor access, or the
+//   courses a head_department oversees),
 //   e.g. "English/Grade 2;Math/Grade 3". Electives use "Department/Elective name".
 // - department_head_of: semicolon-separated "Department/Grade" pairs (any role)
 //
@@ -41,8 +42,9 @@ function resolveRole(roleRaw: string, stageRaw: string): string {
     }
     return `head_${stage}`;
   }
+  if (["head_department", "dept_head", "department_head"].includes(role)) return "head_department";
   if (!["admin", "teacher", "auditor"].includes(role)) {
-    throw new Error(`Invalid role "${roleRaw}" (must be admin, teacher, auditor, or head)`);
+    throw new Error(`Invalid role "${roleRaw}" (must be admin, teacher, auditor, head_department, or head)`);
   }
   return role;
 }
@@ -172,6 +174,9 @@ Deno.serve(async (req) => {
         const rowsToInsert = [
           ...(role === "teacher" || role === "auditor"
             ? courseIds.map(course_id => ({ user_id: userId, course_id, kind: role }))
+            : []),
+          ...(role === "head_department"
+            ? courseIds.map(course_id => ({ user_id: userId, course_id, kind: "dept_head" }))
             : []),
           ...deptHeadIds.map(course_id => ({ user_id: userId, course_id, kind: "dept_head" })),
         ];

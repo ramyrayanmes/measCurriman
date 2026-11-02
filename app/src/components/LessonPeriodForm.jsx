@@ -1,6 +1,7 @@
 // src/components/LessonPeriodForm.jsx
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
+import { useToast } from '../toastContext'
 
 const BLOOMS = [
   { value: 1, label: 'Remembering' },
@@ -12,6 +13,7 @@ const BLOOMS = [
 ]
 
 export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCancel }) {
+  const toast = useToast()
   const [classSection, setClassSection] = useState(existing?.class_section ?? '')
   const [lessonDate, setLessonDate] = useState(existing?.lesson_date ?? '')
   const [learningObjectives, setLearningObjectives] = useState(existing?.learning_objectives ?? '')
@@ -55,7 +57,8 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
       : await supabase.from('lesson_periods').insert(payload)
 
     setSaving(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(error.message); toast(error.message, 'error'); return }
+    toast('Class period saved')
     onSaved()
   }
 

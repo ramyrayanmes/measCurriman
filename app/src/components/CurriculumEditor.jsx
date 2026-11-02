@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import ListEditor from './ListEditor'
 import TableEditor from './TableEditor'
+import { useToast } from '../toastContext'
 import {
   GRADING_COLS, OUTLINE_COLS, normalizeCurriculum, toStorable,
 } from '../curriculumModel'
@@ -55,6 +56,7 @@ export default function CurriculumEditor(props) {
 }
 
 function EditorBody({ course, department, grade, userId, canEdit, copy, official, onReset }) {
+  const toast = useToast()
   const readOnly = !canEdit || Boolean(course.archived_at)
   const defaults = { department: department.name, grade: grade?.name ?? course.name ?? '' }
 
@@ -129,7 +131,8 @@ function EditorBody({ course, department, grade, userId, canEdit, copy, official
     dirty.current = false
     const { error } = await supabase.from('curriculum_working_copies')
       .delete().eq('user_id', userId).eq('course_id', course.id)
-    if (error) { window.alert(error.message); return }
+    if (error) { toast(error.message, 'error'); return }
+    toast('Working copy reset')
     onReset()
   }
 

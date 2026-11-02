@@ -52,7 +52,13 @@
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   white-space: nowrap;
 }
-.header-brand img { height: 34px; border-radius: 4px; }
+.header-brand img { height: 38px; width: 38px; padding: 3px; border-radius: 50%; background: #fff; object-fit: contain; flex-shrink: 0; }
+
+/* ---------- Toasts ---------- */
+.toast-stack { position: fixed; right: 20px; bottom: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-radius: 8px; color: #fff; font-size: 0.875rem; box-shadow: var(--shadow-md); animation: fadeUp 0.25s ease; max-width: 360px; }
+.toast-success { background: var(--accent2); }
+.toast-error { background: var(--danger); }
 .brand-text { font-size: 20px; line-height: 1.1; }
 .header-nav { display: flex; align-items: center; gap: 2px; padding: 0 16px; height: 100%; }
 .nav-tab {

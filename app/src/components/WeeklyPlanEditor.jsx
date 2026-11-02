@@ -3,10 +3,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import WeeklyPlanHeaderForm from './WeeklyPlanHeaderForm'
 import LessonPeriodForm from './LessonPeriodForm'
+import PlanDownloadButtons from './PlanDownloadButtons'
+import { useToast } from '../toastContext'
 
 const BLOOMS_LABELS = { 1: 'Remembering', 2: 'Understanding', 3: 'Applying', 4: 'Analyzing', 5: 'Evaluating', 6: 'Creating' }
 
-export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existingPlan, userId, readOnly, onBack }) {
+export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existingPlan, userId, isAuditor, readOnly, onBack }) {
+  const toast = useToast()
   const [plan, setPlan] = useState(existingPlan)
   const [periods, setPeriods] = useState([])
   const [loading, setLoading] = useState(!!existingPlan)
@@ -34,7 +37,8 @@ export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existing
 
   async function handleDeletePeriod(id) {
     if (!confirm('Delete this class period?')) return
-    await supabase.from('lesson_periods').delete().eq('id', id)
+    const { error } = await supabase.from('lesson_periods').delete().eq('id', id)
+    if (error) toast(error.message, 'error'); else toast('Class period deleted')
     reloadPeriods()
   }
 
@@ -75,9 +79,12 @@ export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existing
           <h3>Week {plan.week_number} — Semester {plan.semester}</h3>
           <p className="muted">{plan.date_from} to {plan.date_to}{plan.grade_level ? ` • ${plan.grade_level}` : ''}</p>
         </div>
-        {!readOnly && (
-          <button className="btn btn-primary btn-sm" onClick={() => setEditingPeriod('new')}>+ Add class period</button>
-        )}
+        <div className="plan-row-actions">
+          <PlanDownloadButtons planId={plan.id} isAuditor={isAuditor} />
+          {!readOnly && (
+            <button className="btn btn-primary btn-sm" onClick={() => setEditingPeriod('new')}>+ Add class period</button>
+          )}
+        </div>
       </div>
 
       {readOnly && <div className="readonly-banner">You have read-only access to this plan.</div>}

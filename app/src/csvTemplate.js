@@ -5,7 +5,7 @@ export function downloadUserTemplate() {
   const exampleRows = [
     'Jane Smith,jane.smith@mes.edu.eg,teacher,,English/Grade 2;English/Grade 3,',
     'Ahmed Hassan,ahmed.hassan@mes.edu.eg,head,elementary,,',
-    'Sara Ali,sara.ali@mes.edu.eg,teacher,,Math/Grade 4,Math/Grade 4',
+    'Sara Ali,sara.ali@mes.edu.eg,head_department,,Math/Grade 4;Math/Grade 5,',
   ]
   const csv = [header, ...exampleRows].join('\n')
 

@@ -5,11 +5,13 @@ import { callEdgeFunctionJson } from '../edgeFunctions'
 import { roleLabel } from '../stageUtils'
 import { courseLabel } from '../access'
 import BulkUserUpload from './BulkUserUpload'
+import { useToast } from '../toastContext'
 
-const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_kindergarten', 'head_elementary', 'head_middle', 'head_high']
-const KIND_LABELS = { teacher: 'Teacher', auditor: 'Auditor', dept_head: 'Department head' }
+const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_department', 'head_kindergarten', 'head_elementary', 'head_middle', 'head_high']
+const KIND_LABELS = { teacher: 'Teacher', auditor: 'Auditor', dept_head: 'Head of Department' }
 
 export default function UsersManager({ departments, courses, grades }) {
+  const toast = useToast()
   const [users, setUsers] = useState([])
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -64,6 +66,7 @@ export default function UsersManager({ departments, courses, grades }) {
         role: newRole,
       })
       setJustCreated({ email: result.email, temp_password: result.temp_password })
+      toast('User created')
       setNewEmail(''); setNewFullName(''); setNewRole('teacher')
       reload()
     } catch (err) {
@@ -74,21 +77,33 @@ export default function UsersManager({ departments, courses, grades }) {
 
   async function handleRoleChange(userId, role) {
     const { error } = await supabase.from('profiles').update({ role }).eq('id', userId)
-    if (error) setError(error.message)
-    else reload()
+    if (error) { setError(error.message); toast(error.message, 'error') }
+    else { toast('Role updated'); reload() }
   }
 
   async function addAssignment(userId, courseId, kind) {
     const { error } = await supabase.from('course_assignments').insert({ user_id: userId, course_id: courseId, kind })
-    if (error) setError(error.message)
-    else reload()
+    if (error) { setError(error.message); toast(error.message, 'error') }
+    else { toast('Assignment added'); reload() }
   }
 
   async function removeAssignment(a) {
     const { error } = await supabase.from('course_assignments').delete()
       .eq('user_id', a.user_id).eq('course_id', a.course_id).eq('kind', a.kind)
-    if (error) setError(error.message)
-    else reload()
+    if (error) { setError(error.message); toast(error.message, 'error') }
+    else { toast('Assignment removed'); reload() }
+  }
+
+  async function handleResetPassword(user) {
+    if (!window.confirm(`Generate a new temporary password for ${user.email}? Their current password will stop working.`)) return
+    try {
+      const result = await callEdgeFunctionJson('create-user', { action: 'reset_password', user_id: user.id })
+      setJustCreated({ email: result.email, temp_password: result.temp_password, reset: true })
+      toast('Temporary password generated')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (err) {
+      toast(err.message, 'error')
+    }
   }
 
   const q = filter.trim().toLowerCase()
@@ -109,7 +124,7 @@ export default function UsersManager({ departments, courses, grades }) {
 
       {error && <p className="error">{error}</p>}
 
-      <BulkUserUpload onDone={reload} />
+      <BulkUserUpload onDone={() => { toast('Bulk upload processed'); reload() }} />
 
       <div className="card">
         <h3>Create new user</h3>
@@ -124,7 +139,7 @@ export default function UsersManager({ departments, courses, grades }) {
         {createError && <p className="error">{createError}</p>}
         {justCreated && (
           <div className="temp-password-box">
-            <strong>Account created.</strong> Share this temporary password with {justCreated.email} — it is only shown once:
+            <strong>{justCreated.reset ? 'Password reset.' : 'Account created.'}</strong> Share this temporary password with {justCreated.email} — it is only shown once:
             <div className="temp-password-value">{justCreated.temp_password}</div>
             <span className="muted">They can change it after signing in via “Change password”.</span>
           </div>
@@ -155,14 +170,18 @@ export default function UsersManager({ departments, courses, grades }) {
                 <select value={user.role} onChange={e => handleRoleChange(user.id, e.target.value)}>
                   {ALL_ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
                 </select>
+                <button className="btn btn-ghost btn-sm" onClick={() => handleResetPassword(user)}>Reset password</button>
                 <button className="btn btn-ghost btn-sm" onClick={() => setOpenUserId(open ? null : user.id)}>
                   {open ? 'Hide' : 'Assignments'} ({mine.length})
                 </button>
               </div>
             </div>
 
-            {user.role.startsWith('head_') && (
-              <p className="muted">Reviews every course in their stage automatically. Add department-head assignments below only for courses outside it.</p>
+            {user.role.startsWith('head_') && user.role !== 'head_department' && (
+              <p className="muted">Head of stage: reviews every course in their stage automatically (all departments).</p>
+            )}
+            {user.role === 'head_department' && (
+              <p className="muted">Head of department: supervises only the department/grade courses listed under Assignments.</p>
             )}
             {user.role === 'admin' && <p className="muted">Admins have access to everything.</p>}
 
@@ -187,7 +206,7 @@ export default function UsersManager({ departments, courses, grades }) {
 }
 
 function AssignmentEditor({ user, mine, departments, courses, gradeById, fullCourseName, onAdd, onRemove }) {
-  const defaultKind = user.role === 'auditor' ? 'auditor' : 'teacher'
+  const defaultKind = user.role === 'auditor' ? 'auditor' : user.role === 'head_department' ? 'dept_head' : 'teacher'
   const [kind, setKind] = useState(defaultKind)
   const [deptId, setDeptId] = useState('')
   const [courseId, setCourseId] = useState('')

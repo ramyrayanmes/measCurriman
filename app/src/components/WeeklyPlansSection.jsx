@@ -2,14 +2,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import WeeklyPlanEditor from './WeeklyPlanEditor'
-import { downloadFromEdgeFunction } from '../edgeFunctions'
+import PlanDownloadButtons from './PlanDownloadButtons'
 
-export default function WeeklyPlansSection({ course, gradeName, userId, isAdmin, canEdit }) {
+export default function WeeklyPlansSection({ course, gradeName, userId, isAdmin, isAuditor, canEdit }) {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [editing, setEditing] = useState(null) // { plan } — plan null means "new"
-  const [busyAction, setBusyAction] = useState(null) // e.g. "planId-docx"
   const [reloadTick, setReloadTick] = useState(0)
 
   useEffect(() => {
@@ -28,17 +27,6 @@ export default function WeeklyPlansSection({ course, gradeName, userId, isAdmin,
     return () => { cancelled = true }
   }, [course.id, reloadTick])
 
-  async function handleExport(planId, format) {
-    setBusyAction(`${planId}-${format}`)
-    setError(null)
-    try {
-      await downloadFromEdgeFunction('export-document', { table: 'weekly_plans', record_id: planId, format }, `plan.${format}`)
-    } catch (err) {
-      setError(err.message)
-    }
-    setBusyAction(null)
-  }
-
   if (editing) {
     const plan = editing.plan
     return (
@@ -47,6 +35,7 @@ export default function WeeklyPlansSection({ course, gradeName, userId, isAdmin,
         defaultGradeLevel={gradeName}
         existingPlan={plan}
         userId={userId}
+        isAuditor={isAuditor}
         readOnly={!canEdit || (plan && plan.teacher_id !== userId && !isAdmin)}
         onBack={() => { setEditing(null); setReloadTick(t => t + 1) }}
       />
@@ -76,20 +65,7 @@ export default function WeeklyPlansSection({ course, gradeName, userId, isAdmin,
             </div>
           </div>
           <div className="plan-row-actions">
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => handleExport(p.id, 'docx')}
-              disabled={busyAction === `${p.id}-docx`}
-            >
-              {busyAction === `${p.id}-docx` ? 'Preparing…' : 'Word'}
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => handleExport(p.id, 'pdf')}
-              disabled={busyAction === `${p.id}-pdf`}
-            >
-              {busyAction === `${p.id}-pdf` ? 'Preparing…' : 'PDF'}
-            </button>
+            <PlanDownloadButtons planId={p.id} isAuditor={isAuditor} />
             <button className="btn btn-primary btn-sm" onClick={() => setEditing({ plan: p })}>Open</button>
           </div>
         </div>
