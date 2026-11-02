@@ -40,6 +40,8 @@ export default function CoursePanel({ course, department, gradeById, userId, isA
           grade={grade}
           userId={userId}
           canEdit={canEdit}
+          isAdmin={isAdmin}
+          reviewer={reviewer}
         />
       )}
 
