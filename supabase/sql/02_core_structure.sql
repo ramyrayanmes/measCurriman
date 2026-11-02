@@ -3,6 +3,13 @@
 -- A "course" is one department/grade pair (or one elective). Everything in the
 -- app (curriculum, versions, weekly plans, access) hangs off a course.
 
+-- Re-runnable: remove any earlier (or v5) copies of the tables created below.
+-- Cascade also removes dependent objects from file 03 if it was already run.
+drop table if exists public.course_assignments cascade;
+drop table if exists public.courses cascade;
+drop table if exists public.departments cascade;
+drop table if exists public.grades cascade;
+
 -- ---------------------------------------------------------------- profiles
 create table if not exists public.profiles (
   id         uuid primary key references auth.users(id) on delete cascade,
