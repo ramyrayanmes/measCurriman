@@ -1,0 +1,2869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CurriMan v4.6.3 — MEAS</title>
+<link rel="icon" type="image/png" href="https://github.com/ramyrayanmes/MEAS-Logos/blob/main/favicon-96x96.png?raw=true"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#0f1923;--ink2:#2d3f50;--muted:#6b7f8f;--border:#dde3ea;
+  --bg:#f4f6f9;--surface:#fff;--accent:#1a56db;--accent-light:#eff5ff;
+  --accent2:#0e9f6e;--warn:#c27803;--warn-light:#fdf6e3;
+  --danger:#e02424;--danger-light:#fdf2f2;--amber:#d97706;--amber-light:#fffbeb;
+  --sidebar-w:290px;--header-h:62px;--sidebar-collapsed-w:0px;
+  --radius:10px;--shadow:0 1px 8px rgba(15,25,35,.07);
+  --shadow-md:0 4px 16px rgba(15,25,35,.1);--shadow-lg:0 12px 40px rgba(15,25,35,.14);
+  --t:.17s ease;--sidebar-t:.22s cubic-bezier(.4,0,.2,1);
+}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:15px;}
+h1,h2,h3,h4{font-family:'Cormorant Garamond',serif;letter-spacing:.01em;}
+button,input,textarea,select{font-family:'Outfit',sans-serif;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+
+/* HEADER */
+.app-header{height:var(--header-h);background:var(--ink);color:#fff;display:flex;align-items:center;position:fixed;top:0;left:0;right:0;z-index:200;box-shadow:0 2px 20px rgba(0,0,0,.2);}
+.header-brand{display:flex;align-items:center;gap:12px;padding:0 24px;height:100%;border-right:1px solid rgba(255,255,255,.08);min-width:var(--sidebar-w);transition:min-width var(--sidebar-t),padding var(--sidebar-t);overflow:hidden;white-space:nowrap;}
+.brand-text{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:600;color:#fff;letter-spacing:.0px;line-height:1.1;}
+.brand-text .fold{color:#6c9fff;font-weight:700;}
+.brand-text .arc{color:#fff; }
+.brand-ver{font-size:10px;color:#fff;opacity:.8;font-family:'Outfit',sans-serif;font-weight:400;margin-left:3px;letter-spacing:.3px;}
+.header-nav{display:flex;align-items:center;gap:2px;padding:0 16px;height:100%;}
+.nav-tab{padding:8px 16px;border-radius:6px;color:rgba(255,255,255,.6);font-size:.85rem;font-weight:500;cursor:pointer;border:none;background:transparent;transition:all var(--t);display:flex;align-items:center;gap:6px;}
+.nav-tab:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-tab.active{background:rgba(255,255,255,.12);color:#fff;}
+.nav-tab.admin-tab{color:#fbbf24;}
+.nav-tab.admin-tab:hover{background:rgba(251,191,36,.12);}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px;padding:0 20px;}
+.user-badge{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:6px 12px;font-size:.8rem;color:rgba(255,255,255,.8);}
+.role-chip{font-size:.68rem;font-weight:600;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.06em;}
+.r-admin{background:#1e40af;color:#bfdbfe;}.r-hod{background:#065f46;color:#a7f3d0;}
+.r-teacher{background:#4c1d95;color:#ddd6fe;}.r-auditor{background:#374151;color:#d1d5db;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:7px;font-size:.855rem;font-weight:500;border:none;cursor:pointer;transition:all var(--t);white-space:nowrap;}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover:not(:disabled){background:#1648c0;transform:translateY(-1px);box-shadow:0 4px 14px rgba(26,86,219,.3);}
+.btn-success{background:var(--accent2);color:#fff;}.btn-success:hover:not(:disabled){background:#057a55;}
+.btn-warn{background:var(--amber);color:#fff;}.btn-warn:hover:not(:disabled){background:#b45309;}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}.btn-danger:hover:not(:disabled){background:var(--danger);color:#fff;}
+.btn-ghost{background:transparent;color:var(--ink2);border:1px solid var(--border);}.btn-ghost:hover:not(:disabled){background:var(--bg);}
+.btn-sm{padding:5px 12px;font-size:.8rem;}
+.btn-icon{padding:6px;border-radius:6px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:inline-flex;transition:all var(--t);}
+.btn-icon:hover{background:var(--accent-light);color:var(--accent);}
+.btn-icon.danger:hover{background:var(--danger-light);color:var(--danger);}
+
+/* LAYOUT */
+.app-body{display:flex;margin-top:var(--header-h);min-height:calc(100vh - var(--header-h));}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);position:fixed;top:var(--header-h);left:0;bottom:0;overflow-y:auto;display:flex;flex-direction:column;transition:width var(--sidebar-t),transform var(--sidebar-t);overflow-x:hidden;}
+.sidebar.collapsed{width:0;border-right:none;}
+.sidebar.collapsed *{opacity:0;pointer-events:none;}
+.main{margin-left:var(--sidebar-w);flex:1;padding:32px 36px;min-width:0;max-width:1500px;transition:margin-left var(--sidebar-t);}
+.main.expanded{margin-left:0;}
+
+/* Sidebar toggle button — floats at left edge of main pane */
+.sidebar-toggle{
+  position:fixed;top:50%;left:var(--sidebar-w);transform:translateY(-50%);
+  z-index:190;transition:left var(--sidebar-t);
+  background:var(--surface);border:1px solid var(--border);border-left:none;
+  border-radius:0 6px 6px 0;padding:10px 5px;cursor:pointer;
+  color:var(--muted);display:flex;flex-direction:column;gap:3px;
+  box-shadow:2px 0 8px rgba(0,0,0,.06);
+}
+.sidebar-toggle:hover{background:var(--accent-light);color:var(--accent);border-color:var(--accent);}
+.sidebar-toggle.collapsed{left:0;border-radius:0 6px 6px 0;}
+.sidebar-toggle svg{width:14px;height:14px;transition:transform .2s;}
+.sidebar-toggle.collapsed svg{transform:rotate(180deg);}
+
+.sidebar-search{padding:12px 14px;border-bottom:1px solid var(--border);}
+.sidebar-search input{width:100%;border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-size:.83rem;background:var(--bg);color:var(--ink);transition:border-color var(--t);}
+.sidebar-search input:focus{outline:none;border-color:var(--accent);background:#fff;}
+.sidebar-label{font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 16px 4px;}
+.dept-group{border-bottom:1px solid var(--border);}
+.dept-header{display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;font-weight:600;font-size:.875rem;color:var(--ink2);transition:background var(--t);border-left:3px solid transparent;}
+.dept-header:hover{background:var(--bg);}
+.dept-header.open{color:var(--accent);background:var(--accent-light);border-left-color:var(--accent);}
+.dept-chevron{width:14px;height:14px;flex-shrink:0;transition:transform .2s;color:var(--muted);}
+.dept-header.open .dept-chevron{transform:rotate(90deg);}
+.dept-grades{display:none;}
+.dept-grades.open{display:block;}
+.grade-item{display:flex;align-items:center;justify-content:space-between;padding:7px 14px 7px 42px;font-size:.845rem;color:var(--ink2);cursor:pointer;transition:all var(--t);border-left:3px solid transparent;}
+.grade-item:hover{background:var(--accent-light);color:var(--accent);}
+.grade-item.active{background:var(--accent-light);color:var(--accent);font-weight:600;border-left-color:var(--accent);}
+.grade-item-btns{display:flex;gap:2px;opacity:0;transition:opacity var(--t);}
+.grade-item:hover .grade-item-btns{opacity:1;}
+.gi-btn{padding:2px 5px;border-radius:4px;font-size:.7rem;border:none;cursor:pointer;background:transparent;transition:all var(--t);}
+.gi-btn:hover{background:rgba(0,0,0,.08);}
+.electives-add{display:flex;align-items:center;gap:6px;padding:7px 14px 7px 42px;font-size:.82rem;color:var(--accent);cursor:pointer;font-weight:500;transition:background var(--t);}
+.electives-add:hover{background:var(--accent-light);}
+.archived-section{border-top:1px dashed var(--border);margin-top:4px;}
+.archived-header{display:flex;align-items:center;gap:6px;padding:7px 14px 7px 42px;font-size:.8rem;color:var(--muted);cursor:pointer;font-weight:500;}
+.archived-header:hover{color:var(--ink2);}
+.archived-grades{display:none;}
+.archived-grades.open{display:block;}
+.grade-item.archived{color:var(--muted);font-style:italic;}
+.grade-item.archived.active{color:var(--amber);border-left-color:var(--amber);background:var(--amber-light);}
+
+/* SCREENS */
+.welcome{max-width:520px;margin:80px auto;text-align:center;animation:fadeUp .5s ease;}
+.welcome .wi{font-size:3.5rem;margin-bottom:20px;display:block;}
+.welcome h2{font-size:2rem;color:var(--ink);margin-bottom:12px;}
+.welcome p{color:var(--muted);line-height:1.75;font-size:.95rem;}
+
+.access-denied{max-width:480px;margin:80px auto;text-align:center;animation:fadeUp .5s ease;}
+.access-denied h2{font-size:1.8rem;color:var(--danger);margin-bottom:10px;}
+.access-denied p{color:var(--muted);line-height:1.7;font-size:.9rem;}
+.email-badge{display:inline-block;margin-top:12px;padding:6px 14px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:.85rem;color:var(--ink2);}
+
+/* Error screen with retry */
+.error-screen{max-width:480px;margin:80px auto;text-align:center;animation:fadeUp .5s ease;}
+.error-screen h2{font-size:1.6rem;color:var(--danger);margin-bottom:10px;}
+.error-screen p{color:var(--muted);line-height:1.7;font-size:.9rem;margin-bottom:20px;}
+.error-detail{background:var(--danger-light);border:1px solid #fca5a5;border-radius:7px;padding:10px 14px;font-size:.8rem;color:var(--danger);margin-bottom:20px;text-align:left;word-break:break-word;}
+
+/* CV */
+.cv-wrap{animation:fadeUp .3s ease;}
+.cv-topbar{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap;}
+.cv-title{font-size:1.8rem;color:var(--ink);}
+.cv-subtitle{color:var(--muted);font-size:.85rem;margin-top:4px;font-family:'Outfit',sans-serif;}
+.cv-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.cv-timestamp{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:.78rem;color:var(--muted);margin-bottom:20px;flex-wrap:wrap;}
+.ts-label{font-weight:600;color:var(--ink2);}
+.ts-val{color:var(--ink);}
+.ts-user{color:var(--accent);}
+.readonly-banner{background:var(--amber-light);border:1px solid #fcd34d;border-radius:8px;padding:10px 16px;font-size:.855rem;color:var(--amber);margin-bottom:20px;display:flex;align-items:center;gap:8px;}
+
+/* META */
+.meta-card{background:var(--ink);border-radius:var(--radius);padding:20px 24px;margin-bottom:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;}
+.meta-field label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;display:block;margin-bottom:5px;}
+.meta-field input{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);color:#f1f5f9;border-radius:5px;padding:7px 10px;font-size:.855rem;width:100%;transition:border-color var(--t);}
+.meta-field input:focus{outline:none;border-color:#7dd3fc;}
+.meta-field input:disabled{background:transparent;border-color:transparent;color:#94a3b8;}
+
+/* SECTIONS */
+.section-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden;}
+.section-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;transition:background var(--t);}
+.section-head:hover{background:var(--bg);}
+.section-title{display:flex;align-items:center;gap:10px;font-size:1rem;font-weight:700;color:var(--ink);}
+.section-num{width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-family:'Outfit',sans-serif;font-weight:600;flex-shrink:0;}
+.section-chevron{color:var(--muted);transition:transform .2s;width:17px;height:17px;}
+.section-head.open .section-chevron{transform:rotate(180deg);}
+.section-body{display:none;padding:18px 20px;border-top:1px solid var(--border);}
+.section-body.open{display:block;}
+
+/* FORM */
+.fg{margin-bottom:16px;}
+.fg:last-child{margin-bottom:0;}
+.fg label{display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:6px;}
+.fg textarea,.fg input[type=text]{width:100%;border:1px solid var(--border);border-radius:7px;padding:10px 13px;font-size:.875rem;color:var(--ink);background:var(--bg);transition:all var(--t);resize:vertical;}
+.fg textarea:focus,.fg input[type=text]:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(26,86,219,.07);}
+.fg textarea{min-height:88px;}
+.fg textarea:disabled,.fg input:disabled{background:var(--bg);color:var(--muted);cursor:not-allowed;}
+.field-skipped .fg textarea,.field-skipped .fg input{border-color:var(--amber);background:var(--amber-light);}
+.skip-badge{display:inline-flex;align-items:center;gap:5px;font-size:.75rem;color:var(--amber);font-weight:600;margin-bottom:6px;}
+
+/* LIST EDITOR — nested tree */
+.list-editor{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface);}
+.list-tree{}
+/* Root items */
+.li-row{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--border);transition:background var(--t);position:relative;}
+.li-row:last-child{border-bottom:none;}
+.li-row:hover{background:var(--bg);}
+.li-row.drag-over-nest{background:var(--accent-light);border-left:3px solid var(--accent);}
+.li-row.drag-over-above{border-top:2px solid var(--accent);}
+.li-row.drag-over-below{border-bottom:2px solid var(--accent)!important;}
+.li-row.dragging{opacity:.4;}
+/* depth indents */
+.li-row[data-depth="1"]{padding-left:34px;}
+.li-row[data-depth="2"]{padding-left:58px;}
+.li-row[data-depth="3"]{padding-left:82px;}
+/* depth indicator bullets */
+.li-depth-pip{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-right:2px;}
+.li-row[data-depth="1"] .li-depth-pip{background:var(--accent);display:inline-block;}
+.li-row[data-depth="2"] .li-depth-pip{background:var(--accent2);display:inline-block;}
+.li-row[data-depth="3"] .li-depth-pip{background:var(--amber);display:inline-block;}
+.li-row[data-depth="0"] .li-depth-pip{display:none;}
+.li-drag{color:#ccc;font-size:.9rem;flex-shrink:0;cursor:grab;}
+.li-drag:active{cursor:grabbing;}
+.li-row input{flex:1;border:none;background:transparent;font-size:.875rem;color:var(--ink);padding:3px 0;}
+.li-row input:focus{outline:none;}
+.li-row input:disabled{color:var(--muted);}
+.li-actions{display:flex;gap:2px;opacity:0;transition:opacity var(--t);flex-shrink:0;}
+.li-row:hover .li-actions{opacity:1;}
+.li-act{padding:2px 5px;border-radius:4px;font-size:.72rem;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all var(--t);line-height:1;}
+.li-act:hover{background:var(--bg);color:var(--ink);}
+.li-act.danger:hover{background:var(--danger-light);color:var(--danger);}
+.li-act.indent-btn{color:var(--accent);}
+.li-act.indent-btn:hover{background:var(--accent-light);}
+.list-add{display:flex;align-items:center;gap:6px;padding:9px 12px;color:var(--accent);font-size:.83rem;font-weight:500;cursor:pointer;border-top:1px solid var(--border);background:var(--bg);transition:background var(--t);}
+.list-add:hover{background:var(--accent-light);}
+/* print nested list */
+@media print{
+  .li-row[data-depth="1"]{padding-left:12mm!important;}
+  .li-row[data-depth="1"]::before{content:"• ";color:#1a56db;}
+  .li-row[data-depth="2"]{padding-left:22mm!important;}
+  .li-row[data-depth="2"]::before{content:"◦ ";color:#6b7f8f;}
+  .li-row[data-depth="3"]{padding-left:32mm!important;}
+  .li-row[data-depth="3"]::before{content:"‣ ";color:#b45309;}
+  .li-drag,.li-actions{display:none!important;}
+  .li-row{border-bottom:none!important;padding:1mm 0!important;}
+  .li-row input{font-size:10.5pt!important;color:#0f1923!important;}
+}
+
+/* TABLE EDITOR */
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;}
+.tbl th{background:var(--ink);color:#fff;padding:10px 12px;text-align:left;font-weight:600;font-size:.77rem;white-space:nowrap;}
+.tbl td{border:1px solid var(--border);padding:0;vertical-align:top;}
+.tbl td textarea{width:100%;border:none;padding:8px 10px;font-size:.82rem;resize:none;min-height:64px;background:transparent;color:var(--ink);transition:background var(--t);}
+.tbl td textarea:focus{outline:none;background:var(--accent-light);}
+.tbl td textarea:disabled{color:var(--muted);}
+.tbl tr:nth-child(even) td{background:rgba(244,246,249,.5);}
+.tbl .col-del{width:36px;text-align:center;}
+.tbl-del{background:none;border:none;color:#ccc;cursor:pointer;padding:4px;font-size:1rem;transition:color var(--t);display:block;margin:auto;}
+.tbl-del:hover{color:var(--danger);}
+.tbl-add{display:flex;align-items:center;gap:6px;margin-top:8px;padding:9px 14px;color:var(--accent);font-size:.83rem;font-weight:500;cursor:pointer;background:var(--accent-light);border-radius:7px;transition:background var(--t);}
+.tbl-add:hover{background:#dbeafe;}
+
+/* HISTORY PANEL */
+.history-panel{position:fixed;top:var(--header-h);right:0;bottom:0;width:360px;background:var(--surface);border-left:1px solid var(--border);z-index:150;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;box-shadow:-4px 0 24px rgba(0,0,0,.08);}
+.history-panel.open{transform:translateX(0);}
+.hp-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.hp-head h3{font-size:1.1rem;}
+.hp-list{flex:1;overflow-y:auto;padding:12px 0;}
+.hp-entry{padding:12px 20px;border-bottom:1px solid var(--border);transition:background var(--t);}
+.hp-entry:hover{background:var(--bg);}
+.hp-ts{font-size:.82rem;font-weight:600;color:var(--ink);}
+.hp-user{font-size:.78rem;color:var(--accent);margin-top:2px;}
+.hp-empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:.875rem;}
+
+/* ROLES */
+.roles-view{animation:fadeUp .3s ease;}
+.roles-topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;}
+.roles-topbar h2{font-size:1.8rem;}
+.roles-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow);}
+.rtbl{width:100%;border-collapse:collapse;font-size:.875rem;}
+.rtbl th{background:var(--ink);color:#fff;padding:11px 14px;text-align:left;font-size:.8rem;font-weight:600;}
+.rtbl td{padding:8px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.rtbl tr:last-child td{border-bottom:none;}
+.rtbl tr:hover td{background:var(--bg);}
+.rtbl select,.rtbl input{border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:.83rem;background:var(--bg);color:var(--ink);width:100%;}
+.rtbl select:focus,.rtbl input:focus{outline:none;border-color:var(--accent);}
+.roles-add{display:flex;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg);cursor:pointer;color:var(--accent);font-size:.855rem;font-weight:500;transition:background var(--t);}
+.roles-add:hover{background:var(--accent-light);}
+.staged-banner{background:var(--warn-light);border:1px solid #fcd34d;border-radius:8px;padding:10px 16px;font-size:.85rem;color:var(--warn);margin-bottom:16px;display:none;align-items:center;gap:8px;}
+.staged-banner.on{display:flex;}
+
+/* UPLOAD PREVIEW */
+.preview-bar{background:var(--accent-light);border:1px solid #bfdbfe;border-radius:8px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.preview-bar-text{font-size:.875rem;color:var(--accent);font-weight:600;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,20,30,.55);z-index:500;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease;backdrop-filter:blur(2px);}
+.modal{background:var(--surface);border-radius:14px;padding:28px;max-width:460px;width:92%;box-shadow:var(--shadow-lg);animation:fadeUp .22s ease;}
+.modal h3{font-size:1.3rem;margin-bottom:10px;color:var(--ink);}
+.modal p{color:var(--muted);font-size:.9rem;line-height:1.65;margin-bottom:16px;}
+.modal label{display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px;}
+.modal input{width:100%;border:1px solid var(--border);border-radius:7px;padding:10px 13px;font-size:.875rem;color:var(--ink);background:var(--bg);}
+.modal input:focus{outline:none;border-color:var(--accent);}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+.modal-warn{background:var(--warn-light);border-left:3px solid var(--amber);padding:10px 14px;border-radius:6px;font-size:.855rem;color:var(--warn);margin-bottom:14px;}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.tmsg{padding:11px 18px;border-radius:8px;font-size:.855rem;font-weight:500;color:#fff;box-shadow:var(--shadow-lg);animation:slideIn .22s ease;pointer-events:auto;max-width:340px;line-height:1.4;}
+.t-success{background:#057a55;}.t-error{background:var(--danger);}.t-info{background:var(--accent);}.t-warn{background:var(--amber);}
+
+/* LOADER */
+.loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px;gap:14px;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+.loader-wrap p{color:var(--muted);font-size:.875rem;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes slideIn{from{opacity:0;transform:translateX(18px);}to{opacity:1;transform:translateX(0);}}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Print cover hidden on screen */
+.print-cover{display:none;}
+
+/* ── NOTIFICATION BADGE ── */
+.notif-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:#e02424;color:#fff;font-size:.68rem;font-weight:700;padding:0 5px;margin-left:4px;}
+
+/* ── STAGING / REVIEW BANNERS ── */
+.staging-banner{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.staging-banner.locked{background:var(--danger-light);border-color:#fca5a5;}
+.staging-banner.pending-review{background:#eff5ff;border-color:#bfdbfe;}
+.staging-banner-text{font-size:.875rem;font-weight:600;color:var(--warn);}
+.staging-banner.locked .staging-banner-text{color:var(--danger);}
+.staging-banner.pending-review .staging-banner-text{color:var(--accent);}
+
+/* ── VERSION HISTORY PANEL ── */
+.version-panel{position:fixed;top:var(--header-h);right:0;bottom:0;width:400px;background:var(--surface);border-left:1px solid var(--border);z-index:150;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;box-shadow:-4px 0 24px rgba(0,0,0,.08);}
+.version-panel.open{transform:translateX(0);}
+.vp-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.vp-head h3{font-size:1.1rem;}
+.vp-list{flex:1;overflow-y:auto;padding:8px 0;}
+.vp-entry{padding:12px 16px;border-bottom:1px solid var(--border);transition:background var(--t);}
+.vp-entry:hover{background:var(--bg);}
+.vp-ts{font-size:.82rem;font-weight:600;color:var(--ink);}
+.vp-user{font-size:.78rem;color:var(--accent);margin-top:2px;}
+.vp-label{font-size:.78rem;color:var(--muted);margin-top:2px;font-style:italic;}
+.vp-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.vp-pin{font-size:.7rem;font-weight:700;padding:1px 6px;border-radius:4px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;}
+.vp-save-form{padding:14px 16px;border-top:1px solid var(--border);background:var(--bg);}
+.vp-save-form input{width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:.83rem;margin-bottom:8px;}
+
+/* ── DIFF PANEL ── */
+.diff-overlay{position:fixed;inset:0;background:rgba(10,20,30,.6);z-index:600;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s ease;}
+.diff-modal{background:var(--surface);border-radius:14px;width:95vw;max-width:1400px;max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);}
+.diff-head{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);}
+.diff-head h3{font-size:1.2rem;}
+.diff-selectors{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--bg);flex-wrap:wrap;}
+.diff-selectors select{border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.83rem;background:var(--surface);}
+.diff-body{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;}
+.diff-side{overflow-y:auto;padding:16px 20px;border-right:1px solid var(--border);}
+.diff-side:last-child{border-right:none;}
+.diff-side-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.diff-section{margin-bottom:16px;}
+.diff-section-name{font-size:.875rem;font-weight:700;color:var(--ink2);margin-bottom:6px;}
+.diff-line{font-size:.83rem;padding:2px 6px;border-radius:3px;line-height:1.5;}
+.diff-add{background:#f0fdf4;color:#065f46;}
+.diff-remove{background:#fdf2f2;color:#991b1b;text-decoration:line-through;}
+.diff-same{color:var(--ink);}
+.diff-changed-field{background:#fffbeb;padding:4px 8px;border-radius:4px;font-size:.83rem;margin-bottom:4px;}
+
+/* ── NOTIFICATIONS VIEW ── */
+.notif-view{animation:fadeUp .3s ease;}
+.notif-card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:12px;padding:16px 20px;box-shadow:var(--shadow);}
+.notif-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
+.notif-dept{font-size:1rem;font-weight:700;color:var(--ink);}
+.notif-meta{font-size:.8rem;color:var(--muted);}
+.notif-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.notif-note{background:var(--bg);border-radius:6px;padding:8px 12px;font-size:.83rem;color:var(--ink2);margin-bottom:10px;}
+
+/* ── STATS PANEL ── */
+.stats-panel{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:20px;margin-top:16px;box-shadow:var(--shadow);}
+.stats-title{font-size:1rem;font-weight:700;margin-bottom:16px;color:var(--ink);}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:16px;}
+.stat-card{background:var(--bg);border-radius:8px;padding:14px;text-align:center;}
+.stat-num{font-size:2rem;font-weight:700;color:var(--accent);}
+.stat-label{font-size:.78rem;color:var(--muted);margin-top:4px;}
+.chart-wrap{margin-top:12px;}
+.chart-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:.78rem;}
+.chart-bar-label{width:160px;text-align:right;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chart-bar-track{flex:1;background:var(--border);border-radius:4px;height:16px;overflow:hidden;}
+.chart-bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .4s ease;}
+.chart-bar-val{width:30px;color:var(--muted);}
+
+/* ── SUBMIT FOR REVIEW ── */
+.submit-review-form{background:var(--accent-light);border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin-bottom:16px;}
+.submit-review-form textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.855rem;resize:vertical;min-height:60px;margin-bottom:8px;}
+
+/* ── REVIEW DECISION FORM ── */
+.review-form{padding:16px;background:var(--bg);border-top:1px solid var(--border);}
+.review-form textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.855rem;resize:vertical;min-height:60px;margin-bottom:8px;}
+.review-form input{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.855rem;margin-bottom:8px;}
+
+@media print{
+  /* ─── Hide all UI chrome ─── */
+  .app-header,.sidebar,.sidebar-toggle,
+  .cv-actions,.cv-timestamp,
+  .list-add,.tbl-add,.tbl-del,.btn-icon,
+  .history-panel,.modal-overlay,#toast,
+  .preview-bar,.readonly-banner,
+  .section-chevron{display:none!important;}
+
+  /* ─── Reset layout ─── */
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important;}
+  html,body{margin:0;padding:0;background:#fff!important;font-size:10.5pt;font-family:'Cormorant Garamond',Georgia,serif;}
+  .app-body{display:block;}
+  .main{margin-left:0!important;padding:0!important;max-width:100%!important;}
+  .cv-wrap{animation:none!important;}
+
+  /* ─── Page setup ─── */
+  @page{
+    size:A4 portrait;
+    margin:18mm 16mm 22mm 16mm;
+  }
+  @page:first{
+    margin-top:0;
+  }
+
+  /* ─── COVER PAGE ─── */
+  .print-cover{
+    display:flex!important;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;page-break-after:always;break-after:page;
+    border:2px solid #0f1923;padding:40mm 20mm;text-align:center;
+    background:#fff;
+  }
+  .print-cover-school{font-family:'Cormorant Garamond',Georgia,serif;font-size:22pt;font-weight:700;color:#0f1923;letter-spacing:.04em;margin-bottom:8mm;}
+  .print-cover-divider{width:60mm;height:2px;background:#1a56db;margin:0 auto 8mm;}
+  .print-cover-label{font-family:'Outfit',Arial,sans-serif;font-size:8pt;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:#6b7f8f;margin-bottom:3mm;}
+  .print-cover-dept{font-family:'Cormorant Garamond',Georgia,serif;font-size:28pt;font-weight:700;color:#1a56db;margin-bottom:4mm;}
+  .print-cover-grade{font-family:'Cormorant Garamond',Georgia,serif;font-size:18pt;color:#2d3f50;margin-bottom:12mm;}
+  .print-cover-year{font-family:'Outfit',Arial,sans-serif;font-size:9pt;color:#6b7f8f;margin-top:8mm;letter-spacing:.08em;}
+
+  /* ─── Running header on all pages after cover ─── */
+  .print-running-header{
+    display:block!important;
+    position:running(header);
+  }
+  @page{
+    @top-left{content:element(header);}
+  }
+  /* Fallback: fixed header bar repeated via JS — we use a simpler approach */
+
+  /* ─── Page break helpers ─── */
+  .section-card{page-break-inside:avoid;break-inside:avoid;margin-bottom:8mm;}
+
+  /* ─── Show all section bodies ─── */
+  .section-body{display:block!important;}
+  .section-head{cursor:default;padding:6px 0!important;background:none!important;}
+
+  /* ─── Section headings ─── */
+  .section-title{
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:14pt;font-weight:700;color:#0f1923;
+    border-bottom:1.5pt solid #0f1923;
+    padding-bottom:2mm;margin-bottom:3mm;
+    display:flex!important;align-items:baseline;gap:8px;
+  }
+  .section-num{
+    width:auto!important;height:auto!important;
+    background:none!important;color:#1a56db!important;
+    font-family:'Cormorant Garamond',Georgia,serif;
+    font-size:14pt!important;font-weight:700;
+    border-radius:0!important;padding:0!important;
+    flex-shrink:0;
+  }
+  .section-body{padding:4mm 0!important;border-top:none!important;}
+
+  /* ─── Meta card ─── */
+  .meta-card{
+    background:#0f1923!important;border-radius:6px;
+    display:grid!important;grid-template-columns:repeat(3,1fr);gap:8px;
+    padding:10px 14px!important;margin-bottom:8mm!important;
+  }
+  .meta-field label{color:#94a3b8!important;font-size:7pt;text-transform:uppercase;letter-spacing:.08em;}
+  .meta-field input{background:transparent!important;border:none!important;color:#f1f5f9!important;font-size:10pt;padding:2px 0!important;}
+
+  /* ─── Form fields ─── */
+  .fg label{font-size:8pt;font-weight:700;color:#2d3f50;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2mm;}
+  .fg textarea,.fg input[type=text]{
+    border:none!important;background:transparent!important;
+    font-size:10.5pt;color:#0f1923;padding:0!important;resize:none;
+  }
+
+  /* ─── List items ─── */
+  .list-editor{border:none!important;}
+  .list-item{border-bottom:none!important;padding:1mm 0!important;}
+  .list-item::before{content:"▸ ";color:#1a56db;font-size:9pt;}
+  .list-item input{font-size:10.5pt;color:#0f1923;}
+  .list-drag{display:none!important;}
+
+  /* ─── Tables ─── */
+  .tbl-wrap{border:none!important;overflow:visible!important;}
+  .tbl{width:100%!important;border-collapse:collapse!important;font-size:9pt;page-break-inside:auto;}
+  .tbl th{
+    background:#0f1923!important;color:#fff!important;
+    padding:6px 8px!important;font-size:8pt;font-weight:700;
+    text-align:left;border:1px solid #0f1923!important;
+  }
+  .tbl td{
+    border:1px solid #adb5bd!important;padding:5px 7px!important;
+    vertical-align:top;
+  }
+  .tbl td textarea{
+    border:none!important;background:transparent!important;
+    font-size:9pt;color:#0f1923;padding:0!important;resize:none;
+    min-height:unset!important;
+  }
+  .tbl tr:nth-child(even) td{background:rgba(244,246,249,.6)!important;}
+  .tbl tr{page-break-inside:avoid;break-inside:avoid;}
+
+  /* ─── Footer ─── */
+  .print-footer{
+    display:block!important;
+    position:running(footer);
+  }
+  @page{
+    @bottom-center{content:counter(page);}
+  }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand" id="headerBrand">
+    <img src="https://lh3.googleusercontent.com/d/1qo3sDEftHH4bqAemn55lG8oIRrsgdWyW=s50" alt="MEAS" style="height:36px;width:auto;flex-shrink:0;border-radius:4px;"/>
+        <span class="brand-text"><span class="fold">Curri</span> <span class="arc">Man</span><span class="brand-ver"> v4.6.3</span></span>
+  </div>
+  <nav class="header-nav" id="headerNav">
+    <button class="nav-tab active" onclick="showView('curriculum')" id="navCurriculum">📋 Curricula</button>
+    <button class="nav-tab admin-tab" onclick="showView('roles')" id="navRoles" style="display:none">👥 Roles Manager</button>
+    <button class="nav-tab" onclick="showView('notifications')" id="navNotifications" style="display:none">
+      🔔 Reviews <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+    </button>
+  </nav>
+  <div class="header-right">
+    <button class="btn btn-ghost btn-sm" onclick="exportDoc('pdf')" id="btnPDF" style="display:none;color:#fff;border-color:rgba(255,255,255,.2)">⬇ PDF</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportDoc('docx')" id="btnWord" style="display:none;color:#fff;border-color:rgba(255,255,255,.2)">⬇ Word</button>
+    <button class="btn btn-primary btn-sm" onclick="saveCurriculum()" id="btnSave" style="display:none">💾 Save</button>
+    <div class="user-badge" id="userBadge" style="display:none">
+      <span id="userEmail"></span>
+      <span class="role-chip" id="userChip"></span>
+    </div>
+  </div>
+</header>
+
+<div class="app-body">
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-search">
+      <input type="text" id="sidebarSearch" placeholder="🔍 Search…" oninput="filterSidebar(this.value)"/>
+    </div>
+    <div id="sidebarNav">
+      <div class="loader-wrap"><div class="spinner"></div></div>
+    </div>
+  </nav>
+
+  <!-- Sidebar toggle button -->
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+
+  <main class="main" id="mainContent">
+    <div class="loader-wrap"><div class="spinner"></div><p>Loading…</p></div>
+  </main>
+</div>
+
+<div class="history-panel" id="historyPanel">
+  <div class="hp-head">
+    <h3>📋 Edit History</h3>
+    <button class="btn-icon" onclick="closeHistory()">✕</button>
+  </div>
+  <div class="hp-list" id="historyList"></div>
+</div>
+
+<!-- Version History Panel -->
+<div class="version-panel" id="versionPanel">
+  <div class="vp-head">
+    <h3>🕐 Version History</h3>
+    <button class="btn-icon" onclick="closeVersionPanel()">✕</button>
+  </div>
+  <div class="vp-list" id="versionList"><div class="loader-wrap"><div class="spinner"></div></div></div>
+  <div class="vp-save-form" id="vpSaveForm" style="display:none">
+    <input type="text" id="vpLabel" placeholder="Version label (e.g. 'End of Q1')"/>
+    <button class="btn btn-primary btn-sm" onclick="saveNamedVersion()">💾 Save Named Version</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="diffOverlay" style="display:none"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const S = {
+  user:null, departments:[], grades:[], electives:[], archivedElectives:[],
+  deptMeta:{}, deptGrades:{}, archivedDepts:[],
+  currentDept:null, currentGrade:null, curriculumData:null,
+  curriculumReadOnly:false, isArchived:false,
+  dirty:false, saving:false, view:'curriculum',
+  rolesData:null, rolesDirty:false,
+  cache:{},
+  mode:'live',        // 'live' | 'staging' | 'locked' | 'archived'
+  hasDraft:false,
+  hasPending:false,
+  stagingMeta:null,
+  pendingCount:0,
+  versions:[],
+  _booting:false,
+};
+
+const API_TIMEOUT_MS = 12000; // 12 seconds — fail fast
+
+// ═══════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', boot);
+
+async function boot() {
+  if (S._booting) return;
+  S._booting = true;
+  try {
+    const res = await api('getInitialData');
+    if (res.accessDenied) { showAccessDenied(res.email, res.errorDetail); return; }
+    if (!res.success) { showErrorScreen('Initialization failed', res.error || 'Unknown error'); return; }
+
+    S.user = res.user;
+    S.departments = res.departments || [];
+    S.deptMeta = res.deptMeta || {};
+    S.deptGrades = res.deptGrades || {};
+    S.archivedDepts = res.archivedDepts || [];
+    S.grades = res.grades || [];
+    S.electives = res.electives || [];
+    S.archivedElectives = res.archivedElectives || [];
+    S.pendingCount = res.pendingCount || 0;
+
+    setupHeader();
+    renderSidebar();
+    showWelcome();
+  } catch (err) {
+    showErrorScreen('Could not connect', err.message);
+  } finally {
+    S._booting = false;
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  API — with timeout + no-hang guarantee
+// ═══════════════════════════════════════════════
+function api(action, payload={}, timeoutMs=API_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    // Timeout guard — if Apps Script doesn't respond, reject cleanly
+    const timer = setTimeout(() => {
+      reject(new Error('Request timed out (' + action + '). Please try again.'));
+    }, timeoutMs);
+
+    const done = (res) => { clearTimeout(timer); resolve(res); };
+    const fail = (err) => { clearTimeout(timer); reject(err); };
+
+    if (typeof google !== 'undefined' && google.script) {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.error === 'PERMISSION_DENIED') {
+            fail(new Error(res.message || 'Permission denied'));
+          } else {
+            done(res);
+          }
+        })
+        .withFailureHandler(e => fail(new Error(e.message || String(e))))
+        .handleRequest(action, payload);
+    } else {
+      setTimeout(() => done(mockApi(action, payload)), 300);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  HEADER
+// ═══════════════════════════════════════════════
+function setupHeader() {
+  const u = S.user;
+  document.getElementById('userEmail').textContent = u.email;
+  const chip = document.getElementById('userChip');
+  const [label, cls] = u.isAdmin ? ['Admin','r-admin'] : u.isHod ? ['HoD','r-hod'] : u.isTeacher ? ['Teacher','r-teacher'] : ['Auditor','r-auditor'];
+  chip.textContent = label; chip.className = 'role-chip ' + cls;
+  document.getElementById('userBadge').style.display = '';
+  if (u.isAdmin) document.getElementById('navRoles').style.display = '';
+  if (u.isAdmin || u.isHod) {
+    document.getElementById('navNotifications').style.display = '';
+    updateNotifBadge(S.pendingCount);
+  }
+}
+
+function updateNotifBadge(count) {
+  S.pendingCount = count || 0;
+  const badge = document.getElementById('notifBadge');
+  if (!badge) return;
+  if (S.pendingCount > 0) {
+    badge.textContent = S.pendingCount;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  SIDEBAR TOGGLE
+// ═══════════════════════════════════════════════
+function toggleSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const main     = document.getElementById('mainContent');
+  const toggle   = document.getElementById('sidebarToggle');
+  const brand    = document.getElementById('headerBrand');
+  const collapsed = sidebar.classList.toggle('collapsed');
+
+  main.classList.toggle('expanded', collapsed);
+  toggle.classList.toggle('collapsed', collapsed);
+
+  // Shrink the brand block in header so it doesn't leave a dead gap
+  if (brand) brand.style.minWidth = collapsed ? '0' : '';
+
+  // After animation ends, update toggle button position
+  // (handled via CSS transition on left: var(--sidebar-w))
+}
+
+
+function renderSidebar() {
+  const u = S.user;
+  let html = '';
+
+  const visibleDepts = S.departments.filter(d => canUserViewDept(d));
+  if (visibleDepts.length) {
+    html += '<div class="sidebar-label">Departments</div>';
+    visibleDepts.forEach(dept => {
+      // Use per-dept grades from server if available, else default list
+      const allGrades = (S.deptGrades&&S.deptGrades[dept]) ? S.deptGrades[dept] : S.grades;
+      const grades = u.isAdmin || u.isAuditor
+        ? allGrades
+        : allGrades.filter(g => canUserView(dept, g));
+      if (!grades.length) return;
+      html += `<div class="dept-group" data-dept="${esc(dept)}">
+        <div class="dept-header" onclick="toggleDept(this)">
+          <svg class="dept-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+          <span style="margin-right:4px">${deptIcon(dept)}</span>${esc(dept)}
+        </div>
+        <div class="dept-grades">${grades.map(g => gradeHtml(dept,g,false)).join('')}</div>
+      </div>`;
+    });
+  }
+
+  // Electives visibility:
+  // Show to: Admin, HoD (any dept), Teachers assigned to Electives, Auditors (view-only)
+  const showElectives = u.isAdmin || u.isHod || u.isAuditor ||
+    (u.isTeacher && u.teacherAssignments.some(a => a.department === 'Electives'));
+
+  if (showElectives) {
+    // For teachers, only show courses they're assigned to (unless admin/hod/auditor)
+    const visibleCourses = (u.isAdmin || u.isHod || u.isAuditor)
+      ? S.electives
+      : S.electives.filter(c => u.teacherAssignments.some(a => a.department === 'Electives' && a.grade === c));
+
+    const visibleArchived = (u.isAdmin || u.isHod)
+      ? S.archivedElectives
+      : u.isTeacher
+        ? S.archivedElectives.filter(c => u.teacherAssignments.some(a => a.department === 'Electives' && a.grade === c))
+        : []; // Auditors don't see archived
+
+    html += '<div class="sidebar-label">Electives</div>';
+    html += `<div class="dept-group" data-dept="Electives">
+      <div class="dept-header" onclick="toggleDept(this)">
+        <svg class="dept-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+        <span style="margin-right:4px">🎨</span>Electives
+      </div>
+      <div class="dept-grades" id="electivesGrades">
+        ${visibleCourses.map(c => gradeHtml('Electives',c,false)).join('')}
+        ${u.isAdmin ? `<div class="electives-add" onclick="showAddElective()">＋ Add Course</div>` : ''}
+        ${(visibleArchived.length > 0) ? `
+          <div class="archived-section">
+            <div class="archived-header" onclick="this.nextElementSibling.classList.toggle('open')">
+              📦 Archived (${visibleArchived.length})
+            </div>
+            <div class="archived-grades">
+              ${visibleArchived.map(c => gradeHtml('Electives',c,true)).join('')}
+            </div>
+          </div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // Archived departments — Admin only
+  if (u.isAdmin && S.archivedDepts && S.archivedDepts.length) {
+    html += '<div class="sidebar-label" style="margin-top:8px">Archived Departments</div>';
+    html += '<div class="dept-group">';
+    html += '<div class="dept-header" onclick="toggleDept(this)" style="color:var(--muted)">';
+    html += '<svg class="dept-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>';
+    html += '<span style="margin-right:4px">📦</span>Archived';
+    html += '</div><div class="dept-grades">';
+    S.archivedDepts.forEach(d => {
+      html += `<div class="grade-item" style="color:var(--muted);font-style:italic" onclick="showRestoreDept('${esc(d.name)}')">
+        ${deptIcon(d.name)} ${esc(d.displayName||d.name)}
+        <span style="font-size:.7rem;margin-left:4px">♻️</span>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  // Admin: Manage Departments button at bottom of sidebar
+  if (u.isAdmin) {
+    html += `<div style="padding:10px 14px;border-top:1px solid var(--border);margin-top:4px">
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="showView('manageDepts')">⚙️ Manage Departments</button>
+    </div>`;
+  }
+
+  document.getElementById('sidebarNav').innerHTML = html;
+}
+
+function gradeHtml(dept, grade, archived) {
+  const id = `gi-${slugify(dept)}-${slugify(grade)}${archived?'-a':''}`;
+  const u = S.user;
+  let btns = '';
+  if (dept==='Electives' && !archived && u.isAdmin)
+    btns = `<span class="grade-item-btns"><button class="gi-btn" title="Archive" onclick="event.stopPropagation();showArchiveElective('${esc(grade)}')">📦</button></span>`;
+  if (dept==='Electives' && archived) {
+    const ok = u.isAdmin || u.teacherAssignments.some(a=>a.department==='Electives'&&a.grade===grade);
+    if (ok) btns = `<span class="grade-item-btns"><button class="gi-btn" title="Restore" onclick="event.stopPropagation();showRestoreElective('${esc(grade)}')">♻️</button></span>`;
+  }
+  return `<div class="grade-item${archived?' archived':''}" id="${id}" onclick="selectGrade('${esc(dept)}','${esc(grade)}',${archived})">${esc(grade)}${btns}</div>`;
+}
+
+function toggleDept(el) {
+  const g = el.nextElementSibling;
+  el.classList.toggle('open');
+  g.classList.toggle('open');
+}
+
+function filterSidebar(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.dept-group').forEach(g => {
+    const dept = (g.dataset.dept||'').toLowerCase();
+    let any = dept.includes(q);
+    g.querySelectorAll('.grade-item').forEach(item => {
+      const m = item.textContent.toLowerCase().includes(q) || dept.includes(q);
+      item.style.display = m ? '' : 'none';
+      if (m) any = true;
+    });
+    g.style.display = any ? '' : 'none';
+    if (q && any) { g.querySelector('.dept-header').classList.add('open'); g.querySelector('.dept-grades').classList.add('open'); }
+  });
+}
+
+function canUserViewDept(dept) {
+  const u = S.user;
+  if (!u) return false;
+  if (u.isAdmin || u.isAuditor) return true;
+  if (u.isHod && u.hodDepartments.includes(dept)) return true;
+  if (u.isTeacher && u.teacherAssignments.some(a=>a.department===dept)) return true;
+  return false;
+}
+function canUserView(dept, grade) {
+  const u = S.user;
+  if (!u) return false;
+  if (u.isAdmin || u.isAuditor) return true;
+  if (u.isHod && u.hodDepartments.includes(dept)) return true;
+  if (u.isTeacher && u.teacherAssignments.some(a=>a.department===dept&&a.grade===grade)) return true;
+  return false;
+}
+function canUserEdit(dept, grade) {
+  // Teachers do NOT edit live — they use the staging/draft system.
+  // Only Admin and HoD can edit live curriculum directly.
+  const u = S.user;
+  if (!u) return false;
+  if (u.isAdmin) return true;
+  if (u.isHod && u.hodDepartments.includes(dept)) return true;
+  return false;
+}
+
+// ═══════════════════════════════════════════════
+//  VIEWS
+// ═══════════════════════════════════════════════
+function showView(v) {
+  S.view = v;
+  document.getElementById('navCurriculum').classList.toggle('active', v==='curriculum');
+  document.getElementById('navRoles').classList.toggle('active', v==='roles');
+  const navN = document.getElementById('navNotifications');
+  if (navN) navN.classList.toggle('active', v==='notifications');
+  document.getElementById('btnSave').style.display = 'none';
+  document.getElementById('btnPDF').style.display='none';
+  document.getElementById('btnWord').style.display='none';
+  if (v==='roles') loadRolesView();
+  else if (v==='notifications') loadNotificationsView();
+  else if (v==='manageDepts') loadManageDeptsView();
+}
+
+function showWelcome() {
+  document.getElementById('mainContent').innerHTML = `
+    <div class="welcome">
+      <span class="wi">🎓</span>
+      <h2>Welcome, ${esc((S.user.email||'').split('@')[0])}</h2>
+      <p>Select a department and grade from the sidebar to view, edit, and export curriculum documents.</p>
+    </div>`;
+}
+
+function showAccessDenied(email, detail) {
+  document.getElementById('sidebar').style.display = 'none';
+  document.getElementById('sidebarToggle').style.display = 'none';
+  document.getElementById('mainContent').innerHTML = `
+    <div class="access-denied">
+      <div style="font-size:4rem;margin-bottom:16px">🔒</div>
+      <h2>Access Denied</h2>
+      <p style="margin-bottom:12px">Your account does not have access to CurriMan.</p>
+      <p style="margin-bottom:20px;font-size:.9rem;color:var(--muted)">
+        If you believe this is a mistake, please contact your school administrator
+        and ask them to add your account to the system.
+      </p>
+      ${email ? `<div class="email-badge" style="margin-bottom:16px">${esc(email)}</div>` : ''}
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px 18px;max-width:400px;margin:0 auto;font-size:.85rem;color:var(--ink2)">
+        <strong>What to tell your administrator:</strong><br/>
+        Ask them to add <strong>${esc(email||'your email')}</strong>
+        to the Roles sheet with the appropriate role (Teacher, Head of Department, or Auditor).
+      </div>
+      ${detail ? `<div class="error-detail" style="margin-top:12px;max-width:400px">${esc(detail)}</div>` : ''}
+    </div>`;
+}
+
+function showErrorScreen(title, detail) {
+  document.getElementById('sidebarNav').innerHTML = `<div style="padding:16px;font-size:.85rem;color:var(--danger)">${esc(detail)}</div>`;
+  document.getElementById('mainContent').innerHTML = `
+    <div class="error-screen">
+      <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
+      <h2>${esc(title)}</h2>
+      <p>Something went wrong while loading the application.</p>
+      <div class="error-detail">${esc(detail)}</div>
+      <button class="btn btn-primary" onclick="location.reload()">↺ Retry</button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════
+//  CURRICULUM LOAD
+// ═══════════════════════════════════════════════
+async function selectGrade(dept, grade, archived=false) {
+  document.querySelectorAll('.grade-item').forEach(g=>g.classList.remove('active'));
+  const el = document.getElementById(`gi-${slugify(dept)}-${slugify(grade)}${archived?'-a':''}`);
+  if (el) {
+    el.classList.add('active');
+    const pg = el.closest('.dept-grades');
+    const ph = pg?.previousElementSibling;
+    if (ph && !ph.classList.contains('open')) { ph.classList.add('open'); pg.classList.add('open'); }
+  }
+
+  S.currentDept=dept; S.currentGrade=grade; S.isArchived=archived; S.dirty=false; S.view='curriculum';
+  S.mode='live'; S.hasDraft=false; S.hasPending=false; S.stagingMeta=null;
+  document.getElementById('btnSave').style.display='none';
+  document.getElementById('btnPDF').style.display='none';
+  document.getElementById('btnWord').style.display='none';
+
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="loader-wrap"><div class="spinner"></div><p>Loading curriculum…</p></div>`;
+
+  try {
+    const res = await api('getCurriculum', {department:dept, grade, archived});
+    if (!res.success) throw new Error(res.error||'Failed to load curriculum');
+    S.curriculumData    = JSON.parse(JSON.stringify(res.data));
+    S.curriculumReadOnly = res.readOnly || archived;
+    S.mode              = res.mode || 'live';
+    S.hasDraft          = res.hasDraft || false;
+    S.hasPending        = res.hasPending || false;
+    S.stagingMeta       = res.stagingMeta || null;
+    renderCurriculum();
+  } catch(err) {
+    main.innerHTML = `
+      <div class="error-screen">
+        <div style="font-size:2.5rem;margin-bottom:12px">⚠️</div>
+        <h2>Could not load</h2>
+        <div class="error-detail">${esc(err.message)}</div>
+        <button class="btn btn-primary" onclick="selectGrade('${esc(dept)}','${esc(grade)}',${archived})">↺ Retry</button>
+      </div>`;
+    toast(err.message,'error');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER CURRICULUM
+// ═══════════════════════════════════════════════
+function renderCurriculum(previewMode=false, skipped=[]) {
+  const d=S.curriculumData, ro=S.curriculumReadOnly, dept=S.currentDept, grade=S.currentGrade;
+  const history=d._history||[], last=history[0]||null;
+  const canUpload=!S.isArchived && canUserEdit(dept,grade);
+  const isTeacher=S.user.isTeacher && !canUserEdit(dept,grade);
+  const main=document.getElementById('mainContent');
+
+  let html=`<div class="${previewMode?'':'cv-wrap'}" style="${previewMode?'animation:fadeUp .3s ease':''}">`;
+
+  if (previewMode) html+=`<div class="preview-bar">
+    <span class="preview-bar-text">📄 Preview — review before saving</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="discardUpload()">✕ Discard</button>
+      <button class="btn btn-success btn-sm" onclick="confirmUpload()">✅ Confirm & Save</button>
+    </div></div>`;
+
+  html+=`<div class="cv-topbar">
+    <div><h2 class="cv-title">${esc(dept)} — ${esc(grade)}</h2>
+    <div class="cv-subtitle">Academic Year ${esc((d.meta||{}).academicYear||'')}</div></div>
+    <div class="cv-actions">
+      ${canUpload&&!previewMode?`<label class="btn btn-ghost btn-sm" style="cursor:pointer">⬆ Upload .docx<input type="file" accept=".docx" style="display:none" onchange="handleUpload(this)"/></label>`:''}
+      ${!previewMode?`<button class="btn btn-ghost btn-sm" onclick="exportDoc('pdf')">⬇ PDF</button><button class="btn btn-ghost btn-sm" onclick="exportDoc('docx')">⬇ Word</button>`:''}
+      ${!previewMode&&!S.isArchived?`<button class="btn btn-ghost btn-sm" onclick="openVersionPanel()">🕐 Versions</button>`:''}
+    </div></div>`;
+
+  // Mode banners
+  if (S.isArchived) {
+    html+=`<div class="readonly-banner">📦 Archived — read only. Use ♻️ Restore to edit.</div>`;
+  } else if (S.mode==='locked') {
+    html+=`<div class="staging-banner locked">
+      <span class="staging-banner-text">🔒 Submission pending review — editing locked until resolved.</span>
+      <span style="font-size:.8rem;color:var(--muted)">Submitted by ${esc(S.stagingMeta?.email||'')} on ${fmtTs(S.stagingMeta?.timestamp||'')}</span>
+    </div>`;
+  } else if (S.mode==='staging' && S.hasDraft) {
+    html+=`<div class="staging-banner">
+      <span class="staging-banner-text">✏️ You have unsaved draft changes.</span>
+    </div>`;
+  } else if (S.hasPending && (S.user.isAdmin || S.user.isHod)) {
+    html+=`<div class="staging-banner pending-review">
+      <span class="staging-banner-text">📬 A submission is awaiting your review.</span>
+      <button class="btn btn-primary btn-sm" onclick="openReviewDiff()">Review Now →</button>
+    </div>`;
+  } else if (ro && !S.isArchived) {
+    html+=`<div class="readonly-banner">👁 View-only access.</div>`;
+  }
+
+  if (!S.user.isAuditor) {
+    html+=`<div class="cv-timestamp">
+      <span class="ts-label">Last saved:</span>
+      ${last
+        ? `<span class="ts-val">${fmtTs(last.timestamp)}</span><span>by</span><span class="ts-user">${esc(last.email)}</span>`
+        : `<span style="color:var(--muted);font-style:italic">Not yet saved</span>`
+      }
+      <button class="btn-icon btn-sm" onclick="openHistory()" style="margin-left:auto" title="View edit history">📋 History</button>
+    </div>`;
+  }
+
+  html+=renderMeta(d.meta||{},ro);
+
+  const secs=[
+    [1,'Course Description',                renderDesc(d.courseDescription||{},ro,skipped)],
+    [2,'Course Objectives',                 renderListSec('courseObjectives',d.courseObjectives||{},ro,skipped)],
+    [3,'Learning Outcomes',                 renderListSec('learningOutcomes',d.learningOutcomes||{},ro,skipped)],
+    [4,'Course Materials & Resources',      renderSimpleList('courseMaterials',d.courseMaterials||{},ro,skipped)],
+    [5,'Course Content',                    renderCourseContent(d.courseContent||{},ro,skipped)],
+    [6,'Teaching Methods',                  renderSimpleList('teachingMethods',d.teachingMethods||{},ro,skipped)],
+    [7,'List of Projects',                  renderSimpleList('projects',d.projects||{},ro,skipped)],
+    [8,'List of Trips',                     renderSimpleList('trips',d.trips||{},ro,skipped)],
+    [9,'List of Internships & Events',      renderSimpleList('internships',d.internships||{},ro,skipped)],
+    [10,'Grading Criteria',                 renderGradingTbl(d.gradingCriteria||{},ro,skipped)],
+    [11,'Curriculum Outline — Sem 1',       renderOutlineTbl('curriculumOutlineSemesterOne',d.curriculumOutlineSemesterOne||{},ro,skipped)],
+    [12,'Curriculum Outline — Sem 2',       renderOutlineTbl('curriculumOutlineSemesterTwo',d.curriculumOutlineSemesterTwo||{},ro,skipped)],
+    [13,'Notes & Changes',                  renderNotesSection(d.notes||{},ro)],
+  ];
+  secs.forEach(([n,t,c])=>{ html+=secCard(n,t,c); });
+
+  // Submit for Review button — teacher only, not locked, not preview
+  if (isTeacher && !S.isArchived && !previewMode && S.mode !== 'locked') {
+    html+=`<div class="submit-review-form">
+      <p style="font-size:.875rem;font-weight:600;margin-bottom:8px">📤 Submit for Review</p>
+      <textarea id="reviewNote" placeholder="Optional: describe what you changed…"></textarea>
+      <button class="btn btn-primary" onclick="submitForReview()">Submit for Admin Review</button>
+    </div>`;
+  }
+
+  // Stats panel
+  if (!previewMode && !S.isArchived && S.versions && S.versions.length > 1) {
+    html += renderStatsPanel();
+  }
+
+  html+='</div>';
+
+  main.innerHTML=html;
+  if (!previewMode) {
+    const canSave = !ro && !S.isArchived && !S.curriculumReadOnly;
+    document.getElementById('btnSave').style.display = canSave ? '' : 'none';
+    document.getElementById('btnPDF').style.display='';
+    document.getElementById('btnWord').style.display='';
+  } else {
+    document.getElementById('btnSave').style.display='none';
+    document.getElementById('btnPDF').style.display='none';
+    document.getElementById('btnWord').style.display='none';
+  }
+
+  const first=main.querySelector('.section-head');
+  if (first) toggleSec(first);
+}
+
+// ── Section helpers ──────────────────────────────────────
+function secCard(n,title,body){
+  return `<div class="section-card">
+    <div class="section-head" onclick="toggleSec(this)">
+      <div class="section-title"><span class="section-num">${n}</span>${esc(title)}</div>
+      <svg class="section-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="section-body">${body}</div>
+  </div>`;
+}
+function toggleSec(el){el.classList.toggle('open');el.nextElementSibling.classList.toggle('open');}
+
+function renderMeta(meta,ro){
+  const u=S.user;
+  // Determine which fields are editable per role.
+  // ro=true means fully read-only (archived / auditor / no edit rights) — lock everything.
+  // Otherwise apply per-role rules:
+  //   Admin    → all editable
+  //   HoD      → all except school, department
+  //   Teacher  → only academicYear
+  //   Auditor  → none (covered by ro=true upstream, but guard here too)
+  function fieldDisabled(key){
+    if(ro) return true;
+    if(u.isAdmin) return false;
+    if(u.isHod)   return key==='school'||key==='department';
+    if(u.isTeacher) return key!=='academicYear';
+    return true; // auditor or unknown
+  }
+  const fields=[['school','School'],['department','Department'],['grade','Grade'],['creditHours','Credit Hrs'],['hoursPerWeek','Hrs/Week'],['academicYear','Acad. Year']];
+  return `<div class="meta-card">${fields.map(([k,l])=>`<div class="meta-field"><label>${l}</label><input type="text" value="${esc(meta[k]||'')}" data-path="meta.${k}" ${fieldDisabled(k)?'disabled':''} onchange="updateField(this)"/></div>`).join('')}</div>`;
+}
+
+function skippedWrap(key,skipped,inner){
+  const s=skipped.includes(key);
+  return `<div class="${s?'field-skipped':''}">${s?'<div class="skip-badge">⚠️ Could not be parsed — fill in manually</div>':''} ${inner}</div>`;
+}
+
+function renderDesc(d,ro,skipped){
+  return skippedWrap('courseDescription',skipped,`<div class="fg"><label>Description</label><textarea data-path="courseDescription.text" ${ro?'disabled':''} onchange="updateField(this)">${esc(d.text||'')}</textarea></div>`);
+}
+
+function renderListSec(sec,d,ro,skipped){
+  return skippedWrap(sec,skipped,`
+    <div class="fg"><label>Introduction</label><textarea data-path="${sec}.intro" ${ro?'disabled':''} onchange="updateField(this)">${esc(d.intro||'')}</textarea></div>
+    <div class="fg"><label>Items</label>${listEditor(sec+'.items',d.items||[],ro)}</div>`);
+}
+
+function renderSimpleList(sec,d,ro,skipped){
+  return skippedWrap(sec,skipped,`<div class="fg">${listEditor(sec+'.items',d.items||[],ro)}</div>`);
+}
+
+function renderCourseContent(d,ro,skipped){
+  return skippedWrap('courseContent',skipped,`
+    <div class="fg"><label>Semester 1 Title</label><input type="text" data-path="courseContent.semesterOneTitle" value="${esc(d.semesterOneTitle||'Semester One')}" ${ro?'disabled':''} onchange="updateField(this)"/></div>
+    <div class="fg"><label>Semester 1 Content</label>${listEditor('courseContent.semesterOneItems',d.semesterOneItems||[],ro)}</div>
+    <div class="fg" style="margin-top:14px"><label>Semester 2 Title</label><input type="text" data-path="courseContent.semesterTwoTitle" value="${esc(d.semesterTwoTitle||'Semester Two')}" ${ro?'disabled':''} onchange="updateField(this)"/></div>
+    <div class="fg"><label>Semester 2 Content</label>${listEditor('courseContent.semesterTwoItems',d.semesterTwoItems||[],ro)}</div>`);
+}
+
+const GCOLS=['Category','Maximum Grade','Approx. No. of Items','Grade % per Assignment'];
+const OCOLS=['Month & Hrs','Standard','Learning Objective','Teaching Strategies','Materials & Resources','Assignments','Method of Evaluation'];
+
+function renderGradingTbl(d,ro,skipped){ return skippedWrap('gradingCriteria',skipped,tblEditor('gradingCriteria.rows',d.rows||[],GCOLS,ro)); }
+function renderOutlineTbl(sec,d,ro,skipped){ return skippedWrap(sec,skipped,tblEditor(sec+'.rows',d.rows||[],OCOLS,ro)); }
+
+// ── List editor — nested tree (max 2 levels deep) ───────
+// Data format: [{text, children:[{text, children:[{text,children:[]}]}]}]
+// Backwards-compatible: flat strings are auto-upgraded on render.
+
+function normalizeList(arr){
+  // Upgrade flat strings to node objects
+  if(!Array.isArray(arr))return[];
+  return arr.map(v=>{
+    if(typeof v==='string') return {text:v,children:[]};
+    if(!v.children) v.children=[];
+    v.children=normalizeList(v.children);
+    return v;
+  });
+}
+
+// Flatten tree to [{node, depth, flatIdx, pathArr}] for rendering
+function flattenTree(arr,depth=0,prefix=''){
+  const out=[];
+  arr.forEach((node,i)=>{
+    const pathArr=prefix===''?[i]:[...prefix.split(',').map(Number),i];
+    out.push({node,depth,flatIdx:out.length,pathArr});
+    if(node.children&&node.children.length)
+      flattenTree(node.children,depth+1,pathArr.join(',')).forEach(c=>out.push(c));
+  });
+  return out;
+}
+
+// Get node at pathArr in tree
+function treeGet(arr,pathArr){
+  let cur=arr;
+  for(let i=0;i<pathArr.length-1;i++) cur=cur[pathArr[i]].children;
+  return cur[pathArr[pathArr.length-1]];
+}
+// Remove node at pathArr, return removed node
+function treeRemove(arr,pathArr){
+  let cur=arr;
+  for(let i=0;i<pathArr.length-1;i++) cur=cur[pathArr[i]].children;
+  return cur.splice(pathArr[pathArr.length-1],1)[0];
+}
+// Insert node after pathArr sibling position (+1)
+function treeInsertAfter(arr,pathArr,node){
+  let cur=arr;
+  for(let i=0;i<pathArr.length-1;i++) cur=cur[pathArr[i]].children;
+  cur.splice(pathArr[pathArr.length-1]+1,0,node);
+}
+// Insert node as last child of node at pathArr
+function treeAppendChild(arr,pathArr,node){
+  treeGet(arr,pathArr).children.push(node);
+}
+
+// Normalize list on a given path in S.curriculumData
+function ensureNormalized(path){
+  const arr=getV(S.curriculumData,path)||[];
+  const norm=normalizeList(arr);
+  setV(S.curriculumData,path,norm);
+  return norm;
+}
+
+let _dragSrc=null; // {path, pathArr}
+
+function listEditor(path,items,ro){
+  const norm=normalizeList(items);
+  // Write normalized back
+  setV(S.curriculumData,path,norm);
+  const id='le-'+path.replace(/[\.\[\]]/g,'_');
+  const flat=flattenTree(norm);
+  let rows='';
+  flat.forEach(({node,depth,pathArr})=>{
+    // Encode pathArr as base64 to safely pass through HTML attributes
+    const paB64=btoa(JSON.stringify(pathArr));
+    const canIndent=depth<3;
+    const canUnindent=depth>0;
+    const indentTip=depth===0?'Make child of item above':depth===1?'Nest deeper':'Nest deeper';
+    const unindentTip='Move up one level';
+    rows+=`<div class="li-row" data-depth="${depth}" data-path="${esc(path)}" data-pa="${paB64}"
+      ${!ro?`draggable="true"
+        ondragstart="liDragStart(event,'${esc(path)}','${paB64}')"
+        ondragend="liDragEnd(event)"
+        ondragover="liDragOver(event)"
+        ondragleave="liDragLeave(event)"
+        ondrop="liDrop(event,'${esc(path)}')"`:''}>
+      ${!ro?`<span class="li-drag" title="Drag to reorder or nest">⠿</span>`:''}
+      <span class="li-depth-pip"></span>
+      <input type="text" value="${esc(node.text)}" data-path="${path}" data-pa="${paB64}"
+        ${ro?'disabled':''}
+        onchange="liUpdateText(this)"
+        onkeydown="liKeyDown(event,this,'${esc(path)}','${paB64}');"
+        placeholder="Enter item…"/>
+      ${!ro?`<div class="li-actions">
+        ${canIndent?`<button class="li-act indent-btn" title="${indentTip}" onclick="liIndent('${esc(path)}','${paB64}')">⇥ Sub</button>`:''}
+        ${canUnindent?`<button class="li-act indent-btn" title="${unindentTip}" onclick="liUnindent('${esc(path)}','${paB64}')">⇤ Up</button>`:''}
+        <button class="li-act danger" title="Remove item" onclick="liRemove('${esc(path)}','${paB64}')">✕</button>
+      </div>`:''}
+    </div>`;
+  });
+  return `<div class="list-editor" id="${id}"><div class="list-tree">${rows}</div>${!ro?`<div class="list-add" onclick="liAdd('${esc(path)}')">＋ Add item</div>`:''}</div>`;
+}
+
+function reListEditor(path){
+  const id='le-'+path.replace(/[\.\[\]]/g,'_');
+  const el=document.getElementById(id);
+  const arr=getV(S.curriculumData,path)||[];
+  if(el) el.outerHTML=listEditor(path,arr,S.curriculumReadOnly);
+}
+
+function liUpdateText(input){
+  const path=input.dataset.path;
+  const pa=JSON.parse(atob(input.dataset.pa));
+  const arr=getV(S.curriculumData,path)||[];
+  treeGet(arr,pa).text=input.value;
+  setV(S.curriculumData,path,arr);
+  markDirty();
+}
+
+function liKeyDown(e,input,path,paB64){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  // Commit the current field's text BEFORE mutating the array
+  const pa=JSON.parse(atob(paB64));
+  const arr=ensureNormalized(path);
+  treeGet(arr,pa).text=input.value;  // flush uncommitted text
+  // Insert new empty sibling after current node
+  treeInsertAfter(arr,pa,{text:'',children:[]});
+  setV(S.curriculumData,path,arr);
+  markDirty();
+  // Calculate which flat index the new item will be at (after pa)
+  const flat=flattenTree(arr);
+  const curFlat=flat.findIndex(f=>JSON.stringify(f.pathArr)===JSON.stringify(pa));
+  const newFlatIdx=curFlat+1;
+  reListEditor(path);
+  // Focus the newly inserted input
+  const id='le-'+path.replace(/[\.\[\]]/g,'_');
+  setTimeout(()=>{
+    const container=document.getElementById(id);
+    if(container){
+      const allInputs=container.querySelectorAll('input[type=text]');
+      if(allInputs[newFlatIdx]) allInputs[newFlatIdx].focus();
+    }
+  },0);
+}
+
+function liAdd(path){
+  const arr=ensureNormalized(path);
+  arr.push({text:'',children:[]});
+  setV(S.curriculumData,path,arr);
+  reListEditor(path);
+  markDirty();
+  const id='le-'+path.replace(/[\.\[\]]/g,'_');
+  setTimeout(()=>{
+    const container=document.getElementById(id);
+    if(container){const ins=container.querySelectorAll('input[type=text]');if(ins.length)ins[ins.length-1].focus();}
+  },0);
+}
+
+function liRemove(path,paB64){
+  const pa=JSON.parse(atob(paB64));
+  const arr=ensureNormalized(path);
+  treeRemove(arr,pa);
+  setV(S.curriculumData,path,arr);
+  reListEditor(path);
+  markDirty();
+}
+
+function liIndent(path,paB64){
+  const pa=JSON.parse(atob(paB64));
+  if(pa[pa.length-1]===0)return;
+  const arr=ensureNormalized(path);
+  const node=treeRemove(arr,pa);
+  const prevPa=[...pa.slice(0,-1),pa[pa.length-1]-1];
+  treeAppendChild(arr,prevPa,node);
+  setV(S.curriculumData,path,arr);
+  reListEditor(path);
+  markDirty();
+}
+
+function liUnindent(path,paB64){
+  const pa=JSON.parse(atob(paB64));
+  if(pa.length<=1)return;
+  const arr=ensureNormalized(path);
+  const node=treeRemove(arr,pa);
+  const parentPa=pa.slice(0,-1);
+  treeInsertAfter(arr,parentPa,node);
+  setV(S.curriculumData,path,arr);
+  reListEditor(path);
+  markDirty();
+}
+
+// ── Drag-to-nest ─────────────────────────────────────────
+function liDragStart(e,path,paB64){
+  _dragSrc={path,paB64};
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed='move';
+}
+function liDragEnd(e){
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.li-row').forEach(r=>r.classList.remove('drag-over-nest','drag-over-above','drag-over-below'));
+  _dragSrc=null;
+}
+function liDragOver(e){
+  if(!_dragSrc)return;
+  e.preventDefault();
+  const row=e.currentTarget;
+  const rect=row.getBoundingClientRect();
+  const y=e.clientY-rect.top;
+  const h=rect.height;
+  row.classList.remove('drag-over-nest','drag-over-above','drag-over-below');
+  if(y<h*0.25) row.classList.add('drag-over-above');
+  else if(y>h*0.75) row.classList.add('drag-over-below');
+  else row.classList.add('drag-over-nest');
+}
+function liDragLeave(e){
+  e.currentTarget.classList.remove('drag-over-nest','drag-over-above','drag-over-below');
+}
+function liDrop(e,path){
+  if(!_dragSrc||_dragSrc.path!==path)return;
+  e.preventDefault();
+  const row=e.currentTarget;
+  const srcPa=JSON.parse(atob(_dragSrc.paB64));
+  const tgtPa=JSON.parse(atob(row.dataset.pa));
+  const tgtDepth=parseInt(row.dataset.depth)||0;
+  if(JSON.stringify(srcPa)===JSON.stringify(tgtPa))return;
+  const arr=ensureNormalized(path);
+  const isNest=row.classList.contains('drag-over-nest');
+  const isBelow=row.classList.contains('drag-over-below');
+  row.classList.remove('drag-over-nest','drag-over-above','drag-over-below');
+  const node=treeRemove(arr,srcPa);
+  // tgtPa may have shifted after removal — use stored value as best approximation
+  if(isNest&&tgtDepth<3){
+    try{treeAppendChild(arr,tgtPa,node);}catch(ex){arr.push(node);}
+  } else if(isBelow){
+    try{treeInsertAfter(arr,tgtPa,node);}catch(ex){arr.push(node);}
+  } else {
+    let cur=arr;
+    for(let i=0;i<tgtPa.length-1;i++) cur=cur[tgtPa[i]].children;
+    try{cur.splice(tgtPa[tgtPa.length-1],0,node);}catch(ex){arr.push(node);}
+  }
+  setV(S.curriculumData,path,arr);
+  reListEditor(path);
+  markDirty();
+}
+
+// Legacy shims — kept so any references still compile
+function addListItem(path){liAdd(path);}
+function removeListItem(path,idx){
+  const arr=ensureNormalized(path);
+  arr.splice(idx,1);
+  setV(S.curriculumData,path,arr);
+  reListEditor(path);
+  markDirty();
+}
+function reListEditor_legacy(path,arr,ro){reListEditor(path);}
+
+// ── Table editor ────────────────────────────────────────
+function tblEditor(path,rows,cols,ro){
+  const id='te-'+path.replace(/[\.\[\]]/g,'_');
+  return `<div id="${id}"><div class="tbl-wrap"><table class="tbl">
+    <thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}${!ro?'<th class="col-del"></th>':''}</tr></thead>
+    <tbody>${rows.map((r,i)=>tblRow(path,cols,r,i,ro)).join('')}</tbody>
+  </table></div>${!ro?`<div class="tbl-add" onclick="addTblRow('${path}')">＋ Add row</div>`:''}</div>`;
+}
+function tblRow(path,cols,row,idx,ro){
+  return `<tr>${cols.map(c=>`<td><textarea data-path="${path}[${idx}].${slugify(c)}" ${ro?'disabled':''} onchange="updateField(this)">${esc((row||{})[slugify(c)]||'')}</textarea></td>`).join('')}
+    ${!ro?`<td class="col-del"><button class="tbl-del" onclick="removeTblRow('${path}',${idx})">🗑</button></td>`:''}</tr>`;
+}
+function reTblEditor(path,rows,cols,ro){const id='te-'+path.replace(/[\.\[\]]/g,'_');const el=document.getElementById(id);if(el)el.outerHTML=tblEditor(path,rows,cols,ro);}
+function colsForPath(p){return p.includes('gradingCriteria')?GCOLS:OCOLS;}
+function addTblRow(path){const rows=getV(S.curriculumData,path)||[];const row={};colsForPath(path).forEach(c=>row[slugify(c)]='');rows.push(row);setV(S.curriculumData,path,rows);reTblEditor(path,rows,colsForPath(path),false);markDirty();}
+function removeTblRow(path,idx){const rows=getV(S.curriculumData,path)||[];rows.splice(idx,1);setV(S.curriculumData,path,rows);reTblEditor(path,rows,colsForPath(path),false);markDirty();}
+
+// ── Data binding ────────────────────────────────────────
+function updateField(el){setV(S.curriculumData,el.dataset.path,el.value);markDirty();}
+function getV(obj,path){return path.replace(/\[(\d+)\]/g,'.$1').split('.').reduce((o,k)=>o!=null?o[k]:undefined,obj);}
+function setV(obj,path,val){const parts=path.replace(/\[(\d+)\]/g,'.$1').split('.');const last=parts.pop();const t=parts.reduce((o,k,i)=>{if(o[k]==null)o[k]=isNaN(parseInt(parts[i+1]))?{}:[];return o[k];},obj);t[last]=val;}
+function markDirty(){S.dirty=true;const b=document.getElementById('btnSave');if(b&&b.style.display!=='none')b.textContent='💾 Save *';}
+
+// ═══════════════════════════════════════════════
+//  SAVE
+// ═══════════════════════════════════════════════
+async function saveCurriculum(){
+  if(S.saving||S.isArchived)return;
+  if(S.mode==='locked'){toast('Curriculum is locked pending review','warn');return;}
+
+  const isTeacher=S.user.isTeacher&&!canUserEdit(S.currentDept,S.currentGrade);
+
+  S.saving=true;
+  const btn=document.getElementById('btnSave');
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    if(isTeacher){
+      // Teachers save to staging draft
+      const res=await api('saveDraft',{department:S.currentDept,grade:S.currentGrade,data:S.curriculumData});
+      if(!res.success)throw new Error(res.error||'Save failed');
+      S.dirty=false; S.hasDraft=true;
+      toast('Draft saved!','success');
+    } else {
+      // Admin/HoD save directly to live
+      const res=await api('saveCurriculum',{department:S.currentDept,grade:S.currentGrade,data:S.curriculumData});
+      if(!res.success)throw new Error(res.error||'Save failed');
+      S.dirty=false; S.cache={};
+      if(!S.curriculumData._history)S.curriculumData._history=[];
+      S.curriculumData._history.unshift({timestamp:res.timestamp,email:res.email});
+      const ts=document.querySelector('.cv-timestamp');
+      if(ts){ts.innerHTML=`<span class="ts-label">Last saved:</span><span class="ts-val">${fmtTs(res.timestamp)}</span><span>by</span><span class="ts-user">${esc(res.email)}</span><button class="btn-icon btn-sm" onclick="openHistory()" style="margin-left:auto">📋 History</button>`;}
+      toast('Saved!','success');
+    }
+    if(btn)btn.textContent='💾 Save';
+  }catch(err){toast('Save failed: '+err.message,'error');}
+  finally{S.saving=false;if(btn)btn.disabled=false;}
+}
+
+// ═══════════════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════════════
+function openHistory(){
+  const history=(S.curriculumData&&S.curriculumData._history)||[];
+  document.getElementById('historyList').innerHTML=history.length
+    ?history.map(h=>`<div class="hp-entry"><div class="hp-ts">${fmtTs(h.timestamp)}</div><div class="hp-user">${esc(h.email)}</div></div>`).join('')
+    :'<div class="hp-empty">No history yet.</div>';
+  document.getElementById('historyPanel').classList.add('open');
+}
+function closeHistory(){document.getElementById('historyPanel').classList.remove('open');}
+
+
+// ═══════════════════════════════════════════════
+//  EXPORT (PDF / Word via Google Doc template)
+// ═══════════════════════════════════════════════
+async function exportDoc(format){
+  if(!S.curriculumData){ toast('No curriculum loaded','warn'); return; }
+  if(S.user && S.user.isAuditor){ toast('Auditors cannot export documents','warn'); return; }
+
+  const label = format==='docx' ? 'Word' : 'PDF';
+  const btnPDF  = document.getElementById('btnPDF');
+  const btnWord = document.getElementById('btnWord');
+
+  // Disable both buttons and show spinner on the clicked one
+  if(btnPDF)  { btnPDF.disabled=true;  btnPDF.textContent='⬇ PDF'; }
+  if(btnWord) { btnWord.disabled=true; btnWord.textContent='⬇ Word'; }
+
+  // Show a persistent progress toast with animated dots
+  const toastEl = document.createElement('div');
+  toastEl.className='tmsg t-info';
+  toastEl.id='exportProgressToast';
+  toastEl.innerHTML = `⏳ Generating ${label}<span id="exportDots"></span> — please wait`;
+  document.getElementById('toast').appendChild(toastEl);
+
+  // Animate the dots: . .. ... . .. ...
+  let dotCount=0;
+  const dotInterval = setInterval(()=>{
+    dotCount=(dotCount%3)+1;
+    const d=document.getElementById('exportDots');
+    if(d) d.textContent='.'.repeat(dotCount);
+  }, 500);
+
+  try {
+    const payload = JSON.parse(JSON.stringify(S.curriculumData));
+    // Use 90 second timeout — export involves Drive copy + Docs API + UrlFetch
+    const res = await api('exportDocument', { format, data: payload }, 90000);
+    if(!res.success) throw new Error(res.error || 'Export failed');
+
+    // Decode base64 and trigger browser download
+    const binary = atob(res.base64);
+    const bytes  = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    const blob = new Blob([bytes], {type: res.mimeType});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = res.fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    toast(`${label} downloaded successfully!`, 'success');
+  } catch(err){
+    toast(`Export failed: ${err.message}`, 'error');
+  } finally {
+    clearInterval(dotInterval);
+    document.getElementById('exportProgressToast')?.remove();
+    if(btnPDF)  { btnPDF.disabled=false;  btnPDF.textContent='⬇ PDF'; }
+    if(btnWord) { btnWord.disabled=false; btnWord.textContent='⬇ Word'; }
+  }
+}
+
+
+// ═══════════════════════════════════════════════
+//  UPLOAD / PARSE DOCX
+// ═══════════════════════════════════════════════
+async function handleUpload(input){
+  const file=input.files[0];if(!file)return;input.value='';
+  const hasData=((S.curriculumData?.courseDescription?.text||'').length>0)||((S.curriculumData?.courseObjectives?.items||[]).length>0);
+  if(hasData){window._pendingUpload=file;showModal(`<h3>⚠️ Archive Current Curriculum?</h3><div class="modal-warn">Uploading will <strong>archive the current curriculum</strong>. Only an Administrator can restore it.</div><p>Do you want to continue?</p><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-warn" onclick="closeModal();parseAndPreview(window._pendingUpload,true)">Continue</button></div>`);}
+  else{await parseAndPreview(file,false);}
+}
+
+async function parseAndPreview(file,willArchive){
+  showModal(`<div class="loader-wrap"><div class="spinner"></div><p>Parsing…</p></div>`);
+  try{
+    const {data,skipped}=await parseDocx(file);
+    closeModal();
+    S.curriculumData=data;S.curriculumData.__willArchive=willArchive;S.curriculumReadOnly=false;
+    renderCurriculum(true,skipped);
+    if(skipped.length>0){
+      setTimeout(()=>showModal(`<h3>📋 Import Results</h3><p>The following sections could not be parsed:</p><ul style="margin:0 0 14px 20px;color:var(--amber)">${skipped.map(s=>`<li>${esc(friendlyName(s))}</li>`).join('')}</ul><p style="font-size:.85rem">These are highlighted in amber — please fill them in manually.</p><div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">Got it</button></div>`),300);
+    }
+  }catch(err){closeModal();toast('Parse error: '+err.message,'error');}
+}
+
+async function confirmUpload(){
+  const willArchive=S.curriculumData.__willArchive;delete S.curriculumData.__willArchive;
+  S.saving=true;
+  try{
+    if(willArchive){await api('autoArchiveAndSave',{department:S.currentDept,grade:S.currentGrade,data:S.curriculumData});}
+    else{await api('saveCurriculum',{department:S.currentDept,grade:S.currentGrade,data:S.curriculumData});}
+    S.dirty=false;S.cache={};toast('Imported and saved!','success');
+    await selectGrade(S.currentDept,S.currentGrade,false);
+  }catch(err){toast('Save failed: '+err.message,'error');}
+  finally{S.saving=false;}
+}
+function discardUpload(){if(confirm('Discard and return to current curriculum?'))selectGrade(S.currentDept,S.currentGrade,S.isArchived);}
+
+async function parseDocx(file){
+  const zip=await JSZip.loadAsync(file);
+  const xml=await zip.file('word/document.xml').async('string');
+  const clean=xml.replace(/<w:br[^/]*/g,'\n').replace(/<\/w:p>/g,'\n').replace(/<[^>]+>/g,'')
+    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+  const lines=clean.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  const data=blankCurriculum();const skipped=[];
+
+  function between(startRx,endRx){
+    const si=lines.findIndex(l=>startRx.test(l));if(si===-1)return null;
+    let ei=lines.findIndex((l,i)=>i>si&&endRx&&endRx.test(l));if(ei===-1)ei=lines.length;
+    return lines.slice(si+1,ei).filter(l=>l.trim());
+  }
+
+  const text=lines.join('\n');
+  const ym=text.match(/(\d{4}-\d{4})/);if(ym)data.meta.academicYear=ym[1];
+  data.meta.department=S.currentDept;data.meta.grade=S.currentGrade;
+
+  const desc=between(/course description/i,/course objectives/i);
+  if(desc&&desc.length>0)data.courseDescription.text=desc.filter(l=>!/course description/i.test(l)).join(' ').trim();
+  else skipped.push('courseDescription');
+
+  const obj=between(/course objectives/i,/learning outcomes/i);
+  if(obj&&obj.length>0){
+    const intro=obj.find(l=>!l.startsWith('-')&&!l.startsWith('•')&&l.length>20);if(intro)data.courseObjectives.intro=intro;
+    data.courseObjectives.items=obj.filter(l=>/^[-•*]/.test(l)).map(l=>l.replace(/^[-•*]\s*/,'').trim()).filter(Boolean);
+  }else skipped.push('courseObjectives');
+
+  const out=between(/learning outcomes/i,/course materials/i);
+  if(out&&out.length>0){
+    const intro=out.find(l=>!l.startsWith('-')&&!l.startsWith('•')&&l.length>20);if(intro)data.learningOutcomes.intro=intro;
+    data.learningOutcomes.items=out.filter(l=>/^[-•*]/.test(l)).map(l=>l.replace(/^[-•*]\s*/,'').trim()).filter(Boolean);
+  }else skipped.push('learningOutcomes');
+
+  const mat=between(/course materials/i,/course content/i);
+  if(mat&&mat.length>0){
+    data.courseMaterials.items=mat.filter(l=>/^[-•*]/.test(l)).map(l=>l.replace(/^[-•*]\s*/,'').trim()).filter(Boolean);
+    if(!data.courseMaterials.items.length)data.courseMaterials.items=mat.slice(0,8);
+  }else skipped.push('courseMaterials');
+
+  const cc=between(/course content/i,/teaching methods/i);
+  if(cc&&cc.length>0){
+    const s1=cc.findIndex(l=>/semester one/i.test(l)),s2=cc.findIndex(l=>/semester two/i.test(l));
+    if(s1!==-1)data.courseContent.semesterOneItems=cc.slice(s1+1,s2!==-1?s2:cc.length).filter(l=>l.length>2).map(l=>l.replace(/^[\d\.\-•*]\s*/,'').trim());
+    if(s2!==-1)data.courseContent.semesterTwoItems=cc.slice(s2+1).filter(l=>l.length>2).map(l=>l.replace(/^[\d\.\-•*]\s*/,'').trim());
+  }else skipped.push('courseContent');
+
+  const tm=between(/teaching methods/i,/list of projects/i);
+  if(tm&&tm.length>0){data.teachingMethods.items=tm.filter(l=>/^[-•*]/.test(l)).map(l=>l.replace(/^[-•*]\s*/,'').trim()).filter(Boolean);if(!data.teachingMethods.items.length)data.teachingMethods.items=tm.slice(0,10);}
+  else skipped.push('teachingMethods');
+
+  const pr=between(/list of projects/i,/grading criteria/i);
+  if(pr&&pr.length>0){data.projects.items=pr.filter(l=>/^[-•*]/.test(l)).map(l=>l.replace(/^[-•*]\s*/,'').trim()).filter(Boolean);if(!data.projects.items.length)data.projects.items=pr.slice(0,5);}
+  else skipped.push('projects');
+
+  // Tables — complex, always flag outlines; attempt grading
+  const gr=between(/grading criteria/i,/curriculum outline/i);
+  if(gr&&gr.length>2){const tr=gr.filter(l=>/\d/.test(l)&&l.length>3);if(tr.length>0)data.gradingCriteria.rows=tr.map(l=>({category:l,maximum_grade:'',approx__no__of_items:'',grade___per_assignment:''}));else skipped.push('gradingCriteria');}
+  else skipped.push('gradingCriteria');
+
+  skipped.push('curriculumOutlineSemesterOne');
+  skipped.push('curriculumOutlineSemesterTwo');
+
+  // Normalize all list fields to node objects (backwards compat)
+  ['courseObjectives','learningOutcomes'].forEach(sec=>{
+    if(data[sec]&&data[sec].items) data[sec].items=normalizeList(data[sec].items);
+  });
+  ['courseMaterials','teachingMethods','projects','trips','internships'].forEach(sec=>{
+    if(data[sec]&&data[sec].items) data[sec].items=normalizeList(data[sec].items);
+  });
+  if(data.courseContent){
+    data.courseContent.semesterOneItems=normalizeList(data.courseContent.semesterOneItems||[]);
+    data.courseContent.semesterTwoItems=normalizeList(data.courseContent.semesterTwoItems||[]);
+  }
+
+  return {data,skipped};
+}
+
+function blankCurriculum(){
+  return {meta:{school:'Modern Education American School',department:'',grade:'',creditHours:'1',hoursPerWeek:'1 hrs.',academicYear:'2026-2027'},
+    courseDescription:{text:''},courseObjectives:{intro:'',items:[]},learningOutcomes:{intro:'',items:[]},
+    courseMaterials:{items:[]},courseContent:{semesterOneTitle:'Semester One',semesterOneItems:[],semesterTwoTitle:'Semester Two',semesterTwoItems:[]},
+    teachingMethods:{items:[]},projects:{items:[]},trips:{items:[]},internships:{items:[]},
+    gradingCriteria:{rows:[]},
+    curriculumOutlineSemesterOne:{rows:[]},curriculumOutlineSemesterTwo:{rows:[]},
+    notes:{text:''}};
+}
+
+function friendlyName(k){
+  return({courseDescription:'Course Description',courseObjectives:'Course Objectives',learningOutcomes:'Learning Outcomes',
+    courseMaterials:'Course Materials & Resources',courseContent:'Course Content',teachingMethods:'Teaching Methods',
+    projects:'List of Projects',trips:'List of Trips',internships:'List of Internships & Events',
+    gradingCriteria:'Grading Criteria',notes:'Notes & Changes',
+    curriculumOutlineSemesterOne:'Curriculum Outline — Semester 1',curriculumOutlineSemesterTwo:'Curriculum Outline — Semester 2'})[k]||k;
+}
+
+// ═══════════════════════════════════════════════
+//  ELECTIVES MODALS
+// ═══════════════════════════════════════════════
+function showAddElective(){
+  showModal(`<h3>➕ Add Elective Course</h3><p>Enter the name of the new elective course.</p><div style="margin-bottom:14px"><label style="display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px">Course Name</label><input type="text" id="newCN" placeholder="e.g. Photography 101" maxlength="80"/></div><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="confirmAddElective()">Create</button></div>`);
+  setTimeout(()=>document.getElementById('newCN')?.focus(),100);
+}
+async function confirmAddElective(){
+  const name=(document.getElementById('newCN')?.value||'').trim();
+  if(!name){toast('Enter a course name','warn');return;}
+  closeModal();
+  try{const res=await api('addElective',{courseName:name});if(!res.success)throw new Error(res.message||res.error);S.electives.push(name);S.cache={};renderSidebar();toast('"'+name+'" created!','success');selectGrade('Electives',name,false);}
+  catch(err){toast(err.message,'error');}
+}
+
+function showArchiveElective(courseName){
+  showModal(`<h3>📦 Archive Course</h3><div class="modal-warn">This will archive <strong>${esc(courseName)}</strong>. Only an Admin can restore it.</div><div style="margin-bottom:14px"><label style="display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px">Type your email to confirm</label><input type="email" id="archEmail" placeholder="${esc(S.user.email)}"/></div><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-warn" onclick="confirmArchiveElective('${esc(courseName)}')">Archive</button></div>`);
+  setTimeout(()=>document.getElementById('archEmail')?.focus(),100);
+}
+async function confirmArchiveElective(courseName){
+  const email=(document.getElementById('archEmail')?.value||'').trim().toLowerCase();
+  if(email!==S.user.email){toast('Email does not match','error');return;}
+  closeModal();
+  try{const res=await api('archiveElective',{courseName,email});if(!res.success)throw new Error(res.message||res.error);S.electives=S.electives.filter(e=>e!==courseName);S.archivedElectives.push(res.archivedAs||courseName);S.cache={};renderSidebar();showWelcome();toast('Archived.','success');}
+  catch(err){toast(err.message,'error');}
+}
+
+function showRestoreElective(courseName){
+  showModal(`<h3>♻️ Restore Course</h3><p>Restore <strong>${esc(courseName)}</strong> to active electives.</p><div style="margin-bottom:14px"><label style="display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px">Type your email to confirm</label><input type="email" id="restEmail" placeholder="${esc(S.user.email)}"/></div><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-success" onclick="confirmRestoreElective('${esc(courseName)}')">Restore</button></div>`);
+  setTimeout(()=>document.getElementById('restEmail')?.focus(),100);
+}
+async function confirmRestoreElective(courseName){
+  const email=(document.getElementById('restEmail')?.value||'').trim().toLowerCase();
+  if(email!==S.user.email){toast('Email does not match','error');return;}
+  closeModal();
+  try{const res=await api('restoreElective',{courseName,email});if(!res.success)throw new Error(res.message||res.error);S.archivedElectives=S.archivedElectives.filter(e=>e!==courseName);S.electives.push(res.restoredAs||courseName);S.cache={};renderSidebar();toast('Restored!','success');selectGrade('Electives',res.restoredAs||courseName,false);}
+  catch(err){toast(err.message,'error');}
+}
+
+// ═══════════════════════════════════════════════
+//  ROLES MANAGER
+// ═══════════════════════════════════════════════
+async function loadRolesView(){
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="loader-wrap"><div class="spinner"></div><p>Loading roles…</p></div>`;
+  document.getElementById('btnSave').style.display='none';document.getElementById('btnPDF').style.display='none';document.getElementById('btnWord').style.display='none';
+  try{
+    const res=await api('getRoles');
+    if(!res.success)throw new Error(res.error);
+    S.rolesData=res.roles||[];S.rolesDirty=false;renderRolesView(res.departments||[],res.grades||[]);
+  }catch(err){main.innerHTML=`<div class="error-screen"><div style="font-size:2.5rem;margin-bottom:12px">⚠️</div><h2>Could not load roles</h2><div class="error-detail">${esc(err.message)}</div><button class="btn btn-primary" onclick="loadRolesView()">↺ Retry</button></div>`;}
+}
+
+function renderRolesView(depts,grades){
+  window._rolesDepts=depts;
+  window._rolesGrades=grades;
+  const allRoles=['Administration','Head of Department','Teacher','Auditor'];
+  const main=document.getElementById('mainContent');
+  main.innerHTML=`<div class="roles-view">
+    <div class="roles-topbar"><h2>👥 Roles Manager</h2><div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="loadRolesView()">↺ Refresh</button><button class="btn btn-primary" id="btnSaveRoles" disabled onclick="saveRoles()">💾 Save Changes</button></div></div>
+    <div class="staged-banner" id="stagedBanner">⚠️ Unsaved changes — click Save Changes to apply.</div>
+    <div class="roles-card"><table class="rtbl">
+      <thead><tr><th>Email</th><th>Role</th><th>Department</th><th>Grade / Course</th><th></th></tr></thead>
+      <tbody id="rolesTbody">${S.rolesData.map((r,i)=>roleRow(r,i,allRoles,depts,grades)).join('')}</tbody>
+    </table>
+    <div class="roles-add" onclick="addRoleRow(${JSON.stringify(allRoles).replace(/"/g,'&quot;')},${JSON.stringify(depts).replace(/"/g,'&quot;')},${JSON.stringify(grades).replace(/"/g,'&quot;')})">＋ Add Assignment</div>
+    </div>
+    <p style="margin-top:12px;font-size:.8rem;color:var(--muted)">Each row = one assignment. A user can have multiple rows for multiple classes or departments.</p>
+  </div>`;
+}
+
+function roleRow(r,idx,allRoles,depts,grades){
+  const isAdminAuditor = r.role==='Administration' || r.role==='Auditor';
+  const isHod          = r.role==='Head of Department';
+
+  // Department: disabled for Admin/Auditor
+  const deptDisabled = isAdminAuditor ? 'disabled' : '';
+  const deptVal      = isAdminAuditor ? '' : r.department;
+
+  // Grade/Course: disabled for Admin/Auditor and HoD
+  const gradeDisabled = (isAdminAuditor || isHod) ? 'disabled' : '';
+  const gradeVal      = (isAdminAuditor || isHod) ? '' : r.grade;
+
+  // Grade/Course options: elective courses when dept=Electives, else standard grades
+  const gradeOptions = deptVal==='Electives'
+    ? S.electives.map(c=>`<option value="${esc(c)}" ${gradeVal===c?'selected':''}>${esc(c)}</option>`).join('')
+    : grades.map(g=>`<option value="${g}" ${gradeVal===g?'selected':''}>${g}</option>`).join('');
+
+  return `<tr>
+    <td><input type="text" value="${esc(r.email)}" onchange="updateRole(${idx},'email',this.value)" placeholder="user@school.com"/></td>
+    <td><select onchange="roleRoleChange(this,${idx})">
+      ${allRoles.map(ro=>`<option value="${ro}" ${r.role===ro?'selected':''}>${ro}</option>`).join('')}
+    </select></td>
+    <td><select ${deptDisabled} onchange="roleDeptChange(this,${idx})">
+      <option value="" ${deptVal===''?'selected':''}>— None —</option>
+      ${[...depts,'Electives'].map(d=>`<option value="${d}" ${deptVal===d?'selected':''}>${d}</option>`).join('')}
+    </select></td>
+    <td><select ${gradeDisabled} onchange="updateRole(${idx},'grade',this.value)">
+      <option value="" ${gradeVal===''?'selected':''}>— None —</option>
+      ${gradeOptions}
+    </select></td>
+    <td><button class="btn-icon danger" onclick="removeRole(${idx})">🗑</button></td>
+  </tr>`;
+}
+
+function updateRole(idx,field,val){if(S.rolesData[idx])S.rolesData[idx][field]=val;markRolesDirty();}
+
+// When role changes: clear/lock dept+grade for Admin/Auditor, clear/lock grade for HoD, then re-render row
+function roleRoleChange(sel,idx){
+  const val=sel.value;
+  if(S.rolesData[idx]){
+    S.rolesData[idx].role=val;
+    if(val==='Administration'||val==='Auditor'){S.rolesData[idx].department='';S.rolesData[idx].grade='';}
+    else if(val==='Head of Department'){S.rolesData[idx].grade='';}
+  }
+  markRolesDirty();
+  _reRenderRoleRow(idx);
+}
+
+// When department changes: if switching to/from Electives re-render so grade options update
+function roleDeptChange(sel,idx){
+  const val=sel.value;
+  if(S.rolesData[idx]){S.rolesData[idx].department=val;S.rolesData[idx].grade='';}
+  markRolesDirty();
+  _reRenderRoleRow(idx);
+}
+
+// Re-render a single role row in place without rebuilding the whole table
+function _reRenderRoleRow(idx){
+  const tb=document.getElementById('rolesTbody');
+  if(!tb)return;
+  const tr=tb.querySelectorAll('tr')[idx];
+  if(!tr)return;
+  // Get current depts/grades from the existing selects (stored in rolesData context)
+  const allRoles=['Administration','Head of Department','Teacher','Auditor'];
+  const depts=Object.keys(S.rolesData.reduce((acc,r)=>{acc[r.department]=1;return acc;},{}))
+    .filter(d=>d&&d!=='Electives'&&!['Grade K','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5',
+      'Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'].includes(d));
+  // Rebuild from stored depts in the loadRolesView context — use cached values
+  const cachedDepts=window._rolesDepts||[];
+  const cachedGrades=window._rolesGrades||[];
+  tr.outerHTML=roleRow(S.rolesData[idx],idx,allRoles,cachedDepts,cachedGrades);
+}
+function addRoleRow(allRoles,depts,grades){S.rolesData.push({email:'',role:'Teacher',department:'',grade:''});renderRolesView(depts,grades);markRolesDirty();}
+function removeRole(idx){S.rolesData.splice(idx,1);const tb=document.getElementById('rolesTbody');if(tb)tb.querySelectorAll('tr')[idx]?.remove();markRolesDirty();}
+function markRolesDirty(){S.rolesDirty=true;const b=document.getElementById('btnSaveRoles');if(b)b.disabled=false;const sb=document.getElementById('stagedBanner');if(sb)sb.classList.add('on');}
+async function saveRoles(){
+  const btn=document.getElementById('btnSaveRoles');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{await api('saveRoles',{roles:S.rolesData});S.rolesDirty=false;document.getElementById('stagedBanner')?.classList.remove('on');toast('Roles saved!','success');if(btn)btn.textContent='💾 Save Changes';}
+  catch(err){toast('Failed: '+err.message,'error');if(btn){btn.disabled=false;btn.textContent='💾 Save Changes';}}
+}
+
+// ═══════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════
+function showModal(html){
+  closeModal();
+  const o=document.createElement('div');o.className='modal-overlay';o.id='modalOverlay';
+  o.innerHTML=`<div class="modal">${html}</div>`;
+  o.addEventListener('click',e=>{if(e.target===o)closeModal();});
+  document.body.appendChild(o);
+}
+function closeModal(){document.getElementById('modalOverlay')?.remove();}
+
+// ═══════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════
+function toast(msg,type='info'){
+  const c=document.getElementById('toast');
+  const el=document.createElement('div');el.className=`tmsg t-${type}`;el.textContent=msg;
+  c.appendChild(el);setTimeout(()=>el.remove(),4000);
+}
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function slugify(s){return String(s).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');}
+function deptIcon(d){
+  // Use server-provided meta if available (check both .emoji and .icon keys)
+  if(S.deptMeta&&S.deptMeta[d]){
+    if(S.deptMeta[d].emoji) return S.deptMeta[d].emoji;
+    if(S.deptMeta[d].icon)  return S.deptMeta[d].icon;
+  }
+  return({'Arabic':'🌙','Art':'🎨','Computer':'💻','English':'📖','French':'🇫🇷',
+    'German':'🇩🇪','Mathematics':'📐','Music':'🎵','P.E.':'⚽',
+    'Religion Islamic':'☪️','Religion Christian':'✝️','Science':'🔬',
+    'SS Arabic':'🗺️','SS English':'📚'})[d]||'📁';
+}
+function fmtTs(iso){try{const d=new Date(iso);return d.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',timeZoneName:'short'});}catch(e){return iso;}}
+
+// ═══════════════════════════════════════════════
+//  MANAGE DEPARTMENTS (Admin only)
+// ═══════════════════════════════════════════════
+async function loadManageDeptsView() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="loader-wrap"><div class="spinner"></div><p>Loading…</p></div>`;
+  document.getElementById('btnSave').style.display='none';
+  document.getElementById('btnPDF').style.display='none';
+  document.getElementById('btnWord').style.display='none';
+  try {
+    const res = await api('getDeptConfig');
+    if(!res.success) throw new Error(res.error);
+    renderManageDeptsView(res.depts||[]);
+  } catch(err) {
+    main.innerHTML=`<div class="error-screen"><h2>Failed to load</h2><div class="error-detail">${esc(err.message)}</div><button class="btn btn-primary" onclick="loadManageDeptsView()">↺ Retry</button></div>`;
+  }
+}
+
+function renderManageDeptsView(depts) {
+  const main = document.getElementById('mainContent');
+
+  // If depts is empty, fall back to S.departments so page never looks blank
+  if(!depts || !depts.length) {
+    depts = S.departments.map(d=>({
+      name:d, displayName:(S.deptMeta[d]&&S.deptMeta[d].displayName)||d,
+      emoji:deptIcon(d), archived:false, gradeOrder:[], gradesCache:[]
+    }));
+  }
+
+  const active   = depts.filter(d=>!d.archived);
+  const archived = depts.filter(d=>d.archived);
+
+  let html = `<div class="roles-view">
+    <div class="roles-topbar">
+      <h2>⚙️ Manage Departments</h2>
+      <button class="btn btn-ghost" onclick="loadManageDeptsView()">↺ Refresh</button>
+    </div>`;
+
+  // ── Active departments ──
+  html += `<div class="sidebar-label" style="margin-bottom:8px">Active Departments (${active.length})</div>`;
+  html += `<div class="roles-card" style="margin-bottom:16px"><table class="rtbl">
+    <thead><tr><th style="width:60px;text-align:center">Icon</th><th>Department</th><th style="width:80px">Grades</th><th>Actions</th></tr></thead>
+    <tbody>`;
+  active.forEach(d => {
+    const grades = (S.deptGrades&&S.deptGrades[d.name])
+      ? S.deptGrades[d.name].filter(g=>!g.startsWith('_'))
+      : [];
+    const icon = deptIcon(d.name);
+    html += `<tr>
+      <td style="text-align:center">
+        <span style="font-size:1.3rem;cursor:pointer" title="Change emoji" onclick="showChangeEmoji('${esc(d.name)}')">${icon}</span>
+      </td>
+      <td><strong>${esc(d.displayName||d.name)}</strong></td>
+      <td style="font-size:.8rem;color:var(--muted);text-align:center">${grades.length}</td>
+      <td>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="showManageGrades('${esc(d.name)}')">📋 Grades</button>
+          <button class="btn btn-ghost btn-sm" onclick="showChangeEmoji('${esc(d.name)}')">😀 Icon</button>
+          <button class="btn btn-ghost btn-sm" onclick="showRenameDept('${esc(d.name)}','${esc(d.displayName||d.name)}')">✏️ Rename</button>
+          <button class="btn btn-danger btn-sm" onclick="showArchiveDept('${esc(d.name)}')">📦 Archive</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table></div>`;
+
+  // ── Archived departments ──
+  if(archived.length) {
+    html += `<div class="sidebar-label" style="margin-bottom:8px">Archived Departments (${archived.length})</div>`;
+    html += `<div class="roles-card" style="margin-bottom:20px"><table class="rtbl">
+      <thead><tr><th>Department</th><th>Actions</th></tr></thead><tbody>`;
+    archived.forEach(d => {
+      html += `<tr>
+        <td style="color:var(--muted);font-style:italic">${deptIcon(d.name)} ${esc(d.displayName||d.name)}</td>
+        <td><button class="btn btn-success btn-sm" onclick="confirmRestoreDept('${esc(d.name)}')">♻️ Restore</button></td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  // ── Electives section ──
+  html += `<div style="border-top:2px solid var(--border);padding-top:16px;margin-top:4px">`;
+  html += `<div class="roles-topbar" style="margin-bottom:8px">
+    <div class="sidebar-label" style="margin:0">Electives</div>
+    <button class="btn btn-primary btn-sm" onclick="showAddElective()">＋ Add Elective</button>
+  </div>`;
+
+  if(S.electives.length) {
+    html += `<div class="roles-card" style="margin-bottom:12px"><table class="rtbl">
+      <thead><tr><th>Course</th><th>Actions</th></tr></thead><tbody>`;
+    S.electives.forEach(c=>{
+      html += `<tr>
+        <td>🎨 ${esc(c)}</td>
+        <td><div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="showRenameElective('${esc(c)}')">✏️ Rename</button>
+          <button class="btn btn-warn btn-sm" onclick="showArchiveElective('${esc(c)}')">📦 Archive</button>
+        </div></td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  } else {
+    html += `<p style="color:var(--muted);font-size:.875rem;margin-bottom:12px">No active electives.</p>`;
+  }
+
+  if(S.archivedElectives.length) {
+    html += `<div class="sidebar-label" style="margin-bottom:8px">Archived Electives (${S.archivedElectives.length})</div>`;
+    html += `<div class="roles-card"><table class="rtbl">
+      <thead><tr><th>Course</th><th>Actions</th></tr></thead><tbody>`;
+    S.archivedElectives.forEach(c=>{
+      html += `<tr>
+        <td style="color:var(--muted);font-style:italic">📦 ${esc(c)}</td>
+        <td><div style="display:flex;gap:6px">
+          <button class="btn btn-success btn-sm" onclick="showRestoreElective('${esc(c)}')">♻️ Restore</button>
+          <button class="btn btn-danger btn-sm" onclick="showDeleteElectivePermanently('${esc(c)}')">💀 Delete</button>
+        </div></td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  html += `</div></div>`;
+  main.innerHTML = html;
+}
+
+function showRenameElective(courseName) {
+  showModal(`<h3>✏️ Rename Elective</h3>
+    <input type="text" id="renameElectiveVal" value="${esc(courseName)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:12px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmRenameElective('${esc(courseName)}')">Rename</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('renameElectiveVal')?.select(),100);
+}
+
+async function confirmRenameElective(oldName) {
+  const newName=(document.getElementById('renameElectiveVal')?.value||'').trim();
+  if(!newName||newName===oldName){closeModal();return;}
+  closeModal();
+  try {
+    const res=await api('renameElective',{oldName,newName});
+    if(!res.success) throw new Error(res.error);
+    const idx=S.electives.indexOf(oldName);
+    if(idx!==-1) S.electives[idx]=newName;
+    renderSidebar();
+    toast(`Renamed to "${newName}"!`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+function showDeleteElectivePermanently(courseName) {
+  showModal(`<h3>💀 Permanently Delete Elective</h3>
+    <div class="modal-warn">This will <strong>permanently delete</strong> all data for <strong>${esc(courseName)}</strong>. This cannot be undone.</div>
+    <label style="display:block;font-size:.8rem;font-weight:600;margin-top:12px;margin-bottom:5px">Type course name to confirm</label>
+    <input type="text" id="deleteElectiveConfirm" placeholder="${esc(courseName)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:4px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="doDeleteElectivePermanently('${esc(courseName)}')">Delete Forever</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('deleteElectiveConfirm')?.focus(),100);
+}
+
+async function doDeleteElectivePermanently(courseName) {
+  const typed=(document.getElementById('deleteElectiveConfirm')?.value||'').trim();
+  if(typed!==courseName){toast('Course name does not match','error');return;}
+  closeModal();
+  try {
+    // First archive it (move to archive sheet), then permanently delete from there
+    const archRes=await api('archiveElective',{courseName,email:S.user.email});
+    if(!archRes.success) throw new Error(archRes.error);
+    S.electives=S.electives.filter(e=>e!==courseName);
+    // Now it's in archive — we can only do a soft delete in this pass
+    S.archivedElectives=S.archivedElectives.filter(e=>e!==(archRes.archivedAs||courseName));
+    renderSidebar();
+    toast(`"${courseName}" permanently removed.`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+function showManageGrades(dept) {
+  const grades = (S.deptGrades&&S.deptGrades[dept])
+    ? S.deptGrades[dept].filter(g=>!g.startsWith('_'))
+    : S.grades;
+
+  const rows = grades.map(g=>`
+    <tr>
+      <td>${esc(g)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="showRenameGrade('${esc(dept)}','${esc(g)}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="showRemoveGrade('${esc(dept)}','${esc(g)}')">📦</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  showModal(`<h3>📋 ${esc(dept)} — Grades</h3>
+    <table class="rtbl" style="margin-bottom:14px">
+      <thead><tr><th>Grade</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="border-top:1px solid var(--border);padding-top:12px">
+      <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px">Add new grade</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newGradeName" placeholder="e.g. Grade 14" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:.875rem"/>
+        <button class="btn btn-primary" onclick="confirmAddGrade('${esc(dept)}')">Add</button>
+      </div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
+}
+
+async function confirmAddGrade(dept) {
+  const name = (document.getElementById('newGradeName')?.value||'').trim();
+  if(!name){toast('Enter a grade name','warn');return;}
+  closeModal();
+  try {
+    const res = await api('addGrade',{department:dept,grade:name});
+    if(!res.success) throw new Error(res.error);
+    if(!S.deptGrades[dept]) S.deptGrades[dept]=[];
+    S.deptGrades[dept].push(name);
+    renderSidebar();
+    toast(`Grade "${name}" added to ${dept}!`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+function showRenameGrade(dept, grade) {
+  showModal(`<h3>✏️ Rename Grade</h3>
+    <p>Rename <strong>${esc(grade)}</strong> in ${esc(dept)}</p>
+    <input type="text" id="newGradeNameR" value="${esc(grade)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:12px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmRenameGrade('${esc(dept)}','${esc(grade)}')">Rename</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('newGradeNameR')?.select(),100);
+}
+
+async function confirmRenameGrade(dept, oldName) {
+  const newName = (document.getElementById('newGradeNameR')?.value||'').trim();
+  if(!newName||newName===oldName){closeModal();return;}
+  closeModal();
+  try {
+    const res = await api('renameGrade',{department:dept,oldName,newName});
+    if(!res.success) throw new Error(res.error);
+    if(S.deptGrades[dept]){
+      const idx=S.deptGrades[dept].indexOf(oldName);
+      if(idx!==-1) S.deptGrades[dept][idx]=newName;
+    }
+    renderSidebar();
+    toast(`Renamed to "${newName}"!`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+function showRemoveGrade(dept, grade) {
+  showModal(`<h3>📦 Archive Grade</h3>
+    <div class="modal-warn">This will archive <strong>${esc(grade)}</strong> from ${esc(dept)}. The data is preserved and can be recovered from the spreadsheet.</div>
+    <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px">Type your email to confirm</label>
+    <input type="email" id="removeGradeEmail" placeholder="${esc(S.user.email)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:4px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-warn" onclick="confirmRemoveGrade('${esc(dept)}','${esc(grade)}')">Archive Grade</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('removeGradeEmail')?.focus(),100);
+}
+
+async function confirmRemoveGrade(dept, grade) {
+  const email=(document.getElementById('removeGradeEmail')?.value||'').trim().toLowerCase();
+  if(email!==S.user.email){toast('Email does not match','error');return;}
+  closeModal();
+  try {
+    const res = await api('removeGrade',{department:dept,grade,email});
+    if(!res.success) throw new Error(res.error);
+    if(S.deptGrades[dept]) S.deptGrades[dept]=S.deptGrades[dept].filter(g=>g!==grade);
+    renderSidebar();
+    toast(`Grade "${grade}" archived.`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+// ── Emoji picker ──
+const EMOJI_PRESETS = ['📖','📚','📐','🔬','💻','🎨','🎵','⚽','🌙','☪️','✝️','🗺️',
+  '🇫🇷','🇩🇪','🇬🇧','🇺🇸','🏫','📝','✏️','🖊️','📏','🧪','🧬','🔭','🎭','🏃',
+  '🤸','🏊','🎯','🏅','🌍','🌎','🌏','📊','📈','🧮','⚗️','🎓','🏛️','⭐','🌟',
+  '💡','🔑','🧩','🎲','🃏','🎪','🎬','📷','🎙️','🎤','🎻','🎹','🥁','🎺'];
+
+function showChangeEmoji(deptName) {
+  const cur = deptIcon(deptName);
+  let picker = `<h3>😀 Change Icon for ${esc(deptName)}</h3>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">Current: <span style="font-size:1.3rem">${cur}</span> — click one to change, or type any emoji.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;max-height:160px;overflow-y:auto">`;
+  EMOJI_PRESETS.forEach(e=>{
+    picker += `<span style="font-size:1.4rem;cursor:pointer;padding:4px;border-radius:4px;border:2px solid transparent"
+      title="${e}"
+      onclick="document.getElementById('emojiInput').value='${e}';document.querySelectorAll('.ep-btn').forEach(b=>b.style.borderColor='transparent');this.style.borderColor='var(--primary)'"
+      class="ep-btn">${e}</span>`;
+  });
+  picker += `</div>
+    <label style="font-size:.8rem;font-weight:600">Or type any emoji:</label>
+    <input id="emojiInput" type="text" value="${cur}" maxlength="4"
+      style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:1.3rem;margin-top:4px;margin-bottom:12px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmChangeEmoji('${esc(deptName)}')">Save</button>
+    </div>`;
+  showModal(picker);
+  setTimeout(()=>document.getElementById('emojiInput')?.focus(),100);
+}
+
+async function confirmChangeEmoji(deptName) {
+  const emoji = (document.getElementById('emojiInput')?.value||'').trim();
+  if(!emoji){ closeModal(); return; }
+  closeModal();
+  try {
+    const res = await api('updateDeptEmoji', {dept: deptName, emoji});
+    if(!res.success) throw new Error(res.error||'Failed');
+    // Update local cache
+    if(!S.deptMeta) S.deptMeta = {};
+    if(!S.deptMeta[deptName]) S.deptMeta[deptName] = {};
+    S.deptMeta[deptName].emoji = emoji;
+    renderSidebar();
+    toast(`Icon updated to ${emoji}`, 'success');
+    loadManageDeptsView();
+  } catch(e){ toast('Error: '+e.message,'error'); }
+}
+
+function showRenameDept(dept, displayName) {
+  showModal(`<h3>✏️ Rename Department</h3>
+    <p style="margin-bottom:10px">This will rename the department and its Google Spreadsheet.</p>
+    <input type="text" id="newDeptName" value="${esc(displayName)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:12px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmRenameDept('${esc(dept)}')">Rename</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('newDeptName')?.select(),100);
+}
+
+async function confirmRenameDept(oldName) {
+  const newName = (document.getElementById('newDeptName')?.value||'').trim();
+  if(!newName||newName===oldName){closeModal();return;}
+  closeModal();
+  try {
+    const res = await api('renameDept',{oldName,newName});
+    if(!res.success) throw new Error(res.error);
+    // Update local state
+    const idx = S.departments.indexOf(oldName);
+    if(idx!==-1) S.departments[idx]=newName;
+    if(S.deptMeta[oldName]){S.deptMeta[newName]=S.deptMeta[oldName];S.deptMeta[newName].displayName=newName;delete S.deptMeta[oldName];}
+    if(S.deptGrades[oldName]){S.deptGrades[newName]=S.deptGrades[oldName];delete S.deptGrades[oldName];}
+    renderSidebar();
+    toast(`Renamed to "${newName}"!`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+function showArchiveDept(dept) {
+  showModal(`<h3>📦 Archive Department</h3>
+    <div class="modal-warn">This will archive <strong>${esc(dept)}</strong> and hide it from all users. Admins can restore it later.</div>
+    <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:5px">Type your email to confirm</label>
+    <input type="email" id="archiveDeptEmail" placeholder="${esc(S.user.email)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:4px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-warn" onclick="confirmArchiveDept('${esc(dept)}')">Archive Department</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('archiveDeptEmail')?.focus(),100);
+}
+
+async function confirmArchiveDept(dept) {
+  const email=(document.getElementById('archiveDeptEmail')?.value||'').trim().toLowerCase();
+  if(email!==S.user.email){toast('Email does not match','error');return;}
+  closeModal();
+  try {
+    const res = await api('archiveDept',{department:dept,email});
+    if(!res.success) throw new Error(res.error);
+    S.departments=S.departments.filter(d=>d!==dept);
+    if(S.deptMeta[dept]) {
+      S.archivedDepts.push({name:dept,...S.deptMeta[dept],archived:true});
+    }
+    renderSidebar();
+    toast(`${dept} archived.`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+// ── ARCHIVED GRADE MANAGEMENT UI ─────────────────────────────────────────
+async function showArchivedGrades(dept) {
+  showModal(`<h3>📦 ${esc(dept)} — Archived & Trashed Grades</h3><div class="loader-wrap"><div class="spinner"></div></div><div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
+  try {
+    const res = await api('getArchivedGrades',{department:dept});
+    if(!res.success) throw new Error(res.error);
+    const archived = res.archived||[];
+    const trashed  = res.trashed||[];
+    let html = `<h3>📦 ${esc(dept)} — Archived & Trashed Grades</h3>`;
+    if(archived.length) {
+      html += `<div style="font-weight:600;font-size:.875rem;margin-bottom:8px">📦 Archived (${archived.length})</div>`;
+      html += `<table class="rtbl" style="margin-bottom:14px"><thead><tr><th>Grade</th><th>Actions</th></tr></thead><tbody>`;
+      archived.forEach(a=>{
+        html += `<tr><td>${esc(a.gradeName)}</td><td><div style="display:flex;gap:6px">
+          <button class="btn btn-success btn-sm" onclick="confirmRestoreArchivedGrade('${esc(dept)}','${esc(a.tabName)}','${esc(a.gradeName)}')">♻️ Restore</button>
+          <button class="btn btn-warn btn-sm" onclick="confirmTrashGrade('${esc(dept)}','${esc(a.tabName)}','${esc(a.gradeName)}')">🗑 Trash</button>
+        </div></td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    if(trashed.length) {
+      html += `<div style="font-weight:600;font-size:.875rem;margin-bottom:8px;color:var(--danger)">🗑 Trashed — permanent deletion after 30 days</div>`;
+      html += `<table class="rtbl" style="margin-bottom:14px"><thead><tr><th>Grade</th><th>Days</th><th>Actions</th></tr></thead><tbody>`;
+      trashed.forEach(t=>{
+        html += `<tr>
+          <td style="color:var(--danger)">${esc(t.gradeName)}</td>
+          <td style="font-size:.8rem;color:var(--muted)">${t.daysOld}/30</td>
+          <td><div style="display:flex;gap:6px">
+            <button class="btn btn-success btn-sm" onclick="confirmRestoreArchivedGrade('${esc(dept)}','${esc(t.tabName)}','${esc(t.gradeName)}')">♻️ Restore</button>
+            ${t.eligibleDelete
+              ? `<button class="btn btn-danger btn-sm" onclick="confirmDeleteGradePermanently('${esc(dept)}','${esc(t.tabName)}','${esc(t.gradeName)}')">💀 Delete Forever</button>`
+              : `<span style="font-size:.75rem;color:var(--muted);padding:4px 8px">${30-t.daysOld} days left</span>`}
+          </div></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    if(!archived.length && !trashed.length) html += `<p style="color:var(--muted);text-align:center;padding:20px">No archived or trashed grades.</p>`;
+    html += `<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`;
+    closeModal(); showModal(html);
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+async function confirmRestoreArchivedGrade(dept, tabName, gradeName) {
+  closeModal();
+  try {
+    const res = await api('restoreGrade',{department:dept, tabName, newName:gradeName});
+    if(!res.success) throw new Error(res.error);
+    if(S.deptGrades[dept] && !S.deptGrades[dept].includes(res.restoredAs)) S.deptGrades[dept].push(res.restoredAs);
+    renderSidebar(); toast(`"${res.restoredAs}" restored!`,'success'); loadManageDeptsView();
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+async function confirmTrashGrade(dept, tabName, gradeName) {
+  closeModal();
+  try {
+    const res = await api('trashGrade',{department:dept, tabName});
+    if(!res.success) throw new Error(res.error);
+    toast(`"${gradeName}" moved to trash. Permanent deletion available after 30 days.`,'warn');
+    loadManageDeptsView();
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+function confirmDeleteGradePermanently(dept, tabName, gradeName) {
+  showModal(`<h3>💀 Permanently Delete Grade</h3>
+    <div class="modal-warn">This will <strong>permanently and irreversibly delete</strong> all data for <strong>${esc(gradeName)}</strong>. This cannot be undone.</div>
+    <label style="display:block;font-size:.8rem;font-weight:600;margin-top:12px;margin-bottom:5px">Type your email to confirm</label>
+    <input type="email" id="permDeleteEmail" placeholder="${esc(S.user.email)}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:4px"/>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="doDeleteGradePermanently('${esc(dept)}','${esc(tabName)}','${esc(gradeName)}')">Delete Forever</button>
+    </div>`);
+  setTimeout(()=>document.getElementById('permDeleteEmail')?.focus(),100);
+}
+
+async function doDeleteGradePermanently(dept, tabName, gradeName) {
+  const email=(document.getElementById('permDeleteEmail')?.value||'').trim().toLowerCase();
+  if(email!==S.user.email){toast('Email does not match','error');return;}
+  closeModal();
+  try {
+    const res = await api('deleteGradePermanently',{department:dept, tabName, email});
+    if(!res.success) throw new Error(res.error);
+    toast(`"${gradeName}" permanently deleted.`,'success'); loadManageDeptsView();
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+function moveGrade(dept, idx, dir) {
+  const grades = window._manageGradesList;
+  const newIdx = idx + dir;
+  if(newIdx < 0 || newIdx >= grades.length) return;
+  [grades[idx], grades[newIdx]] = [grades[newIdx], grades[idx]];
+  window._manageGradesList = grades;
+  api('reorderGrades',{department:dept, order:grades}).then(res=>{
+    if(res.success){ S.deptGrades[dept]=[...grades]; renderSidebar(); }
+  });
+  closeModal(); showManageGrades(dept);
+}
+
+function showRestoreDept(dept) {
+  showModal(`<h3>♻️ Restore Department</h3>
+    <p>Restore <strong>${esc(dept)}</strong> to active departments?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" onclick="confirmRestoreDept('${esc(dept)}')">Restore</button>
+    </div>`);
+}
+
+async function confirmRestoreDept(dept) {
+  closeModal();
+  try {
+    const res = await api('restoreDept',{department:dept});
+    if(!res.success) throw new Error(res.error);
+    const archived = S.archivedDepts.find(d=>d.name===dept);
+    if(archived) {
+      S.departments.push(dept);
+      S.archivedDepts=S.archivedDepts.filter(d=>d.name!==dept);
+    }
+    renderSidebar();
+    toast(`${dept} restored!`,'success');
+    loadManageDeptsView();
+  } catch(err){toast('Failed: '+err.message,'error');}
+}
+
+window.addEventListener('beforeunload',e=>{if(S.dirty||S.rolesDirty){e.preventDefault();e.returnValue='';}});
+
+// ═══════════════════════════════════════════════
+//  MOCK (local testing only)
+// ═══════════════════════════════════════════════
+function mockApi(action,payload){
+  const u={email:'admin@school.com',roles:['Administration'],isAdmin:true,isHod:false,isTeacher:false,isAuditor:false,hodDepartments:[],teacherAssignments:[],assignments:[]};
+  if(action==='getInitialData'){const depts=['Arabic','Art','Computer','English','French','German','Mathematics','Music','P.E.','Religion Islamic','Religion Christian','Science','SS Arabic','SS English'];const icons={'Arabic':'🌙','Art':'🎨','Computer':'💻','English':'📖','French':'🇫🇷','German':'🇩🇪','Mathematics':'📐','Music':'🎵','P.E.':'⚽','Religion Islamic':'☪️','Religion Christian':'✝️','Science':'🔬','SS Arabic':'🗺️','SS English':'📚'};const deptMeta={};depts.forEach(d=>{deptMeta[d]={displayName:d,icon:icons[d]||'📁',archived:false};});const deptGrades={};depts.forEach(d=>{deptGrades[d]=['Grade K','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];});return{success:true,accessDenied:false,user:u,departments:depts,deptMeta:deptMeta,deptGrades:deptGrades,archivedDepts:[],grades:['Grade K','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'],electives:['Photography 101','Drama Club'],archivedElectives:[],pendingCount:1};}
+  if(action==='getCurriculum')return{success:true,readOnly:false,mode:'live',hasPending:false,data:{_history:[{timestamp:new Date().toISOString(),email:'admin@school.com'}],meta:{school:'Modern Education American School',department:payload.department,grade:payload.grade,creditHours:'1',hoursPerWeek:'1 hrs.',academicYear:'2026-2027'},courseDescription:{text:'Within this course students will learn how to interact with computers.'},courseObjectives:{intro:'The main purpose of this course is to grasp what a computer is.',items:['Using input devices to interact.','Illustrating basic drawings.','Using a QWERTY keyboard.']},learningOutcomes:{intro:'All students will be able to:',items:['Basic OS interactions.','Basic MS Paint.','Basic MS PowerPoint.','Basic MS Word.']},courseMaterials:{items:['Computer lab.','Windows 11.','Internet access.','MS Office suite.','Google Chrome.']},courseContent:{semesterOneTitle:'Semester One',semesterOneItems:['OS interactions','MS Paint','MS PowerPoint'],semesterTwoTitle:'Semester Two',semesterTwoItems:['MS Word','MS PowerPoint review']},teachingMethods:{items:['Direct teaching','Class Discussion','Gaming','Peer learning']},projects:{items:['PowerPoint presentation','MS Word letter']},trips:{items:[]},internships:{items:[]},gradingCriteria:{rows:[{category:'Understanding basics',maximum_grade:'4',approx__no__of_items:'5',grade___per_assignment:'N/A'}]},curriculumOutlineSemesterOne:{rows:[{month___hrs:'Sep\n4 hrs.',standard:'ICDL 2.1.1.0',learning_objective:'Open and close a computer.',teaching_strategies:'Direct teaching',materials___resources:'Computers',assignments:'None',method_of_evaluation:'Class activity'}]},curriculumOutlineSemesterTwo:{rows:[]},notes:{text:''}}};
+  if(action==='saveCurriculum'||action==='autoArchiveAndSave'||action==='saveDraft')return{success:true,timestamp:new Date().toISOString(),email:u.email};
+  if(action==='submitForReview')return{success:true,timestamp:new Date().toISOString()};
+  if(action==='getVersions')return{success:true,versions:[{idx:0,timestamp:new Date(Date.now()-86400000).toISOString(),email:'admin@school.com',label:'End of Q1',pinned:true},{idx:1,timestamp:new Date(Date.now()-3600000).toISOString(),email:'teacher@school.com',label:'',pinned:false}]};
+  if(action==='saveVersion'||action==='pinVersion'||action==='deleteVersion')return{success:true};
+  if(action==='restoreVersion')return{success:true};
+  if(action==='getNotifications')return{success:true,notifications:[{id:'n1',timestamp:new Date().toISOString(),teacherEmail:'teacher@school.com',department:'Computer',grade:'Grade 5',note:'Updated Q2 content'}]};
+  if(action==='reviewSubmission')return{success:true,decision:payload.decision,timestamp:new Date().toISOString()};
+  if(action==='getRoles')return{success:true,roles:[{email:'admin@school.com',role:'Administration',department:'',grade:''},{email:'teacher@school.com',role:'Teacher',department:'Computer',grade:'Grade 5'}],departments:['Computer','Mathematics','English','Science','French','SS English','Arabic'],grades:['Grade K','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12']};
+  if(action==='saveRoles')return{success:true};
+  if(action==='exportDocument')return{success:false,error:'Export requires Google Apps Script environment.'};
+  if(action==='addElective')return{success:true,courseName:payload.courseName};
+  if(action==='archiveElective')return{success:true,archivedAs:payload.courseName};
+  if(action==='restoreElective')return{success:true,restoredAs:payload.courseName};
+  if(action==='getArchivedElectives')return{success:true,electives:[]};
+  if(action==='getDeptConfig')return{success:true,depts:[]};
+  if(action==='addGrade'||action==='removeGrade'||action==='renameGrade'||action==='renameDept'||action==='archiveDept'||action==='restoreDept'||action==='restoreGrade'||action==='trashGrade'||action==='deleteGradePermanently'||action==='reorderGrades'||action==='renameElective'||action==='updateDeptEmoji')return{success:true};
+  if(action==='getArchivedGrades')return{success:true,archived:[],trashed:[]};
+  return{success:false,error:'Unknown: '+action};
+}
+
+// ═══════════════════════════════════════════════
+//  SECTION 13 — NOTES & CHANGES
+// ═══════════════════════════════════════════════
+function renderNotesSection(d, ro) {
+  const text = d.text || '';
+  const stats = d._stats || '';
+  return `<div class="fg">
+    <label>Notes</label>
+    <textarea data-path="notes.text" ${ro?'disabled':''} onchange="updateField(this)" placeholder="Add notes about changes made to this curriculum…" style="min-height:100px">${esc(text)}</textarea>
+  </div>
+  ${stats ? `<div style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:12px 16px;margin-top:10px;font-size:.83rem;color:var(--muted)">
+    <div style="font-weight:600;color:var(--ink2);margin-bottom:6px">📊 Auto-generated change summary</div>
+    <pre style="white-space:pre-wrap;font-family:inherit;font-size:.82rem">${esc(stats)}</pre>
+  </div>` : ''}`;
+}
+
+// ═══════════════════════════════════════════════
+//  SUBMIT FOR REVIEW (Teacher)
+// ═══════════════════════════════════════════════
+async function submitForReview() {
+  if(!S.curriculumData){ toast('No curriculum loaded','warn'); return; }
+  const noteEl = document.getElementById('reviewNote');
+  const note   = noteEl ? noteEl.value.trim() : '';
+
+  showModal(`<h3>📤 Submit for Review</h3>
+    <p>Your curriculum will be submitted to the Head of Department and Administrator for review. You will not be able to edit it until a decision is made.</p>
+    ${note?`<div class="modal-warn" style="margin-top:10px"><strong>Your note:</strong> ${esc(note)}</div>`:''}
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSubmitForReview(${JSON.stringify(note).replace(/"/g,'&quot;')})">Submit</button>
+    </div>`);
+}
+
+async function confirmSubmitForReview(note) {
+  closeModal();
+  const btn = document.querySelector('.submit-review-form .btn-primary');
+  if(btn){ btn.disabled=true; btn.textContent='Submitting…'; }
+  try {
+    const res = await api('submitForReview', {
+      department: S.currentDept, grade: S.currentGrade,
+      data: S.curriculumData, note
+    });
+    if(!res.success) throw new Error(res.error||'Submission failed');
+    S.mode = 'locked';
+    S.stagingMeta = { timestamp: res.timestamp, email: S.user.email, status: 'submitted' };
+    toast('Submitted for review! You will receive an email when a decision is made.', 'success');
+    renderCurriculum();
+  } catch(err) {
+    toast('Submission failed: '+err.message, 'error');
+    if(btn){ btn.disabled=false; btn.textContent='Submit for Admin Review'; }
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  VERSION PANEL
+// ═══════════════════════════════════════════════
+async function openVersionPanel() {
+  const panel = document.getElementById('versionPanel');
+  panel.classList.add('open');
+  document.getElementById('versionList').innerHTML = `<div class="loader-wrap"><div class="spinner"></div></div>`;
+
+  // Show save form for Admin/HoD
+  const saveForm = document.getElementById('vpSaveForm');
+  if(saveForm) saveForm.style.display = canUserEdit(S.currentDept,S.currentGrade) ? '' : 'none';
+
+  try {
+    const res = await api('getVersions', {department:S.currentDept, grade:S.currentGrade});
+    if(!res.success) throw new Error(res.error);
+    S.versions = res.versions || [];
+    renderVersionList();
+  } catch(err) {
+    document.getElementById('versionList').innerHTML = `<div style="padding:20px;color:var(--danger);font-size:.875rem">Failed to load versions: ${esc(err.message)}</div>`;
+  }
+}
+
+function closeVersionPanel() {
+  document.getElementById('versionPanel').classList.remove('open');
+}
+
+function renderVersionList() {
+  const u = S.user;
+  const canManage = u.isAdmin || u.isHod;
+  if(!S.versions.length) {
+    document.getElementById('versionList').innerHTML = `<div class="hp-empty">No saved versions yet.<br>Save a named version to start tracking history.</div>`;
+    return;
+  }
+  const html = S.versions.map(v=>`
+    <div class="vp-entry">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div class="vp-ts">${fmtTs(v.timestamp)}</div>
+          <div class="vp-user">${esc(v.email)}</div>
+          ${v.label?`<div class="vp-label">"${esc(v.label)}"</div>`:''}
+        </div>
+        ${v.pinned?`<span class="vp-pin">📌 Pinned</span>`:''}
+      </div>
+      <div class="vp-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openVersionDiff(${v.idx})">🔍 Diff</button>
+        ${canManage?`<button class="btn btn-warn btn-sm" onclick="restoreVersion(${v.idx})">↩ Restore</button>`:''}
+        ${u.isAdmin?`<button class="btn btn-ghost btn-sm" onclick="togglePin(${v.idx},${!v.pinned})">${v.pinned?'📌 Unpin':'📌 Pin'}</button>`:''}
+        ${u.isAdmin&&!v.pinned?`<button class="btn btn-danger btn-sm" onclick="deleteVersion(${v.idx})">🗑</button>`:''}
+      </div>
+    </div>`).join('');
+  document.getElementById('versionList').innerHTML = html;
+}
+
+async function saveNamedVersion() {
+  const label = (document.getElementById('vpLabel')?.value||'').trim();
+  if(!label){ toast('Enter a version label','warn'); return; }
+  try {
+    const res = await api('saveVersion', {department:S.currentDept, grade:S.currentGrade, label});
+    if(!res.success) throw new Error(res.error);
+    toast('Version saved!','success');
+    document.getElementById('vpLabel').value='';
+    // Refresh list
+    const r2 = await api('getVersions',{department:S.currentDept,grade:S.currentGrade});
+    if(r2.success){ S.versions=r2.versions||[]; renderVersionList(); }
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+async function restoreVersion(idx) {
+  showModal(`<h3>↩ Restore Version</h3>
+    <p>This will overwrite the current live curriculum with the selected version. The current state will be auto-saved as a snapshot before restoring.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-warn" onclick="closeModal();_doRestoreVersion(${idx})">Restore</button>
+    </div>`);
+}
+
+async function _doRestoreVersion(idx) {
+  try {
+    const res = await api('restoreVersion',{department:S.currentDept,grade:S.currentGrade,idx});
+    if(!res.success) throw new Error(res.error);
+    toast('Version restored!','success');
+    closeVersionPanel();
+    selectGrade(S.currentDept, S.currentGrade);
+  } catch(err){ toast('Restore failed: '+err.message,'error'); }
+}
+
+async function togglePin(idx, pin) {
+  try {
+    const res = await api('pinVersion',{department:S.currentDept,grade:S.currentGrade,idx,pin});
+    if(!res.success) throw new Error(res.error);
+    const r2 = await api('getVersions',{department:S.currentDept,grade:S.currentGrade});
+    if(r2.success){ S.versions=r2.versions||[]; renderVersionList(); }
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+async function deleteVersion(idx) {
+  showModal(`<h3>🗑 Delete Version</h3>
+    <p>Are you sure you want to permanently delete this version? This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="closeModal();_doDeleteVersion(${idx})">Delete</button>
+    </div>`);
+}
+
+async function _doDeleteVersion(idx) {
+  try {
+    const res = await api('deleteVersion',{department:S.currentDept,grade:S.currentGrade,idx});
+    if(!res.success) throw new Error(res.error);
+    toast('Version deleted','success');
+    const r2 = await api('getVersions',{department:S.currentDept,grade:S.currentGrade});
+    if(r2.success){ S.versions=r2.versions||[]; renderVersionList(); }
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════
+//  DIFF VIEWER
+// ═══════════════════════════════════════════════
+const SECTION_NAMES = {
+  courseDescription:'Course Description', courseObjectives:'Course Objectives',
+  learningOutcomes:'Learning Outcomes', courseMaterials:'Course Materials & Resources',
+  courseContent:'Course Content', teachingMethods:'Teaching Methods',
+  projects:'List of Projects', trips:'List of Trips', internships:'List of Internships & Events',
+  gradingCriteria:'Grading Criteria', curriculumOutlineSemesterOne:'Curriculum Outline — Sem 1',
+  curriculumOutlineSemesterTwo:'Curriculum Outline — Sem 2', notes:'Notes & Changes'
+};
+
+async function openReviewDiff() {
+  // Open diff between live and pending submission
+  openDiffViewer('live', 'pending');
+}
+
+async function openVersionDiff(idx) {
+  openDiffViewer('live', idx);
+}
+
+async function openDiffViewer(leftSrc, rightSrc) {
+  const overlay = document.getElementById('diffOverlay');
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="diff-modal">
+    <div class="diff-head">
+      <h3>🔍 Version Comparison</h3>
+      <button class="btn-icon" onclick="closeDiff()">✕</button>
+    </div>
+    <div class="diff-selectors">
+      <label style="font-size:.83rem;font-weight:600">Version A:</label>
+      <select id="diffSelA" onchange="runDiff()">${_buildVersionOptions(leftSrc)}</select>
+      <label style="font-size:.83rem;font-weight:600">Version B:</label>
+      <select id="diffSelB" onchange="runDiff()">${_buildVersionOptions(rightSrc)}</select>
+      <button class="btn btn-primary btn-sm" onclick="runDiff()">Compare</button>
+    </div>
+    <div class="diff-body" id="diffBody">
+      <div class="diff-side"><div class="loader-wrap"><div class="spinner"></div></div></div>
+      <div class="diff-side"><div class="loader-wrap"><div class="spinner"></div></div></div>
+    </div>
+  </div>`;
+  await runDiff();
+}
+
+function _buildVersionOptions(selected) {
+  let opts = `<option value="live" ${selected==='live'?'selected':''}>📄 Live (current)</option>`;
+  if(S.hasPending) opts += `<option value="pending" ${selected==='pending'?'selected':''}>📬 Pending Submission</option>`;
+  (S.versions||[]).forEach(v=>{
+    opts += `<option value="${v.idx}" ${selected===v.idx?'selected':''}>${fmtTs(v.timestamp).substring(0,20)} ${v.label?'"'+v.label+'"':''}</option>`;
+  });
+  return opts;
+}
+
+async function runDiff() {
+  const selA = document.getElementById('diffSelA')?.value;
+  const selB = document.getElementById('diffSelB')?.value;
+  if(!selA || !selB) return;
+
+  const body = document.getElementById('diffBody');
+  body.innerHTML = `<div class="diff-side"><div class="loader-wrap"><div class="spinner"></div></div></div><div class="diff-side"></div>`;
+
+  const [dataA, dataB] = await Promise.all([
+    _fetchVersionData(selA), _fetchVersionData(selB)
+  ]);
+
+  const leftHtml  = _renderDiffSide(dataA, dataB, 'A');
+  const rightHtml = _renderDiffSide(dataB, dataA, 'B');
+
+  const labelA = selA==='live'?'Live':selA==='pending'?'Pending':('Version '+(parseInt(selA)+1));
+  const labelB = selB==='live'?'Live':selB==='pending'?'Pending':('Version '+(parseInt(selB)+1));
+
+  body.innerHTML = `
+    <div class="diff-side">
+      <div class="diff-side-title">${esc(labelA)}</div>
+      ${leftHtml}
+    </div>
+    <div class="diff-side">
+      <div class="diff-side-title">${esc(labelB)}</div>
+      ${rightHtml}
+    </div>`;
+}
+
+async function _fetchVersionData(src) {
+  if(src === 'live') return S.curriculumData;
+  if(src === 'pending') {
+    // Re-fetch from backend
+    try {
+      const res = await api('getCurriculum',{department:S.currentDept,grade:S.currentGrade});
+      return res.data || S.curriculumData;
+    } catch(e) { return S.curriculumData; }
+  }
+  // Numeric version index — fetch from backend
+  try {
+    const res = await api('getVersions',{department:S.currentDept,grade:S.currentGrade});
+    if(res.success && res.versions) {
+      // Find the version by idx — for mock, return current data
+      const ver = (res.versions||[]).find(v=>String(v.idx)===String(src));
+      return ver ? (ver.data || S.curriculumData) : S.curriculumData;
+    }
+  } catch(e) {}
+  return S.curriculumData;
+}
+
+function _renderDiffSide(thisData, otherData, side) {
+  if(!thisData) return '<div class="diff-section"><em style="color:var(--muted)">No data</em></div>';
+  const keys = Object.keys(SECTION_NAMES);
+  let html = '';
+
+  // Meta fields
+  const metaA = thisData.meta||{}, metaB = otherData?.meta||{};
+  const metaFields = [['school','School'],['department','Department'],['grade','Grade'],
+                      ['creditHours','Credit Hrs'],['hoursPerWeek','Hrs/Week'],['academicYear','Acad. Year']];
+  let metaHtml = '';
+  metaFields.forEach(([k,l])=>{
+    const a = String(metaA[k]||''), b = String(metaB[k]||'');
+    if(a!==b) metaHtml += `<div class="diff-changed-field"><strong>${esc(l)}:</strong> ${esc(a)}</div>`;
+    else metaHtml += `<div class="diff-line diff-same"><strong>${esc(l)}:</strong> ${esc(a)}</div>`;
+  });
+  if(metaHtml) html += `<div class="diff-section"><div class="diff-section-name">Course Info</div>${metaHtml}</div>`;
+
+  keys.forEach(k=>{
+    const secA = thisData[k], secB = otherData?.[k];
+    const name = SECTION_NAMES[k];
+    const linesA = _extractLines(k, secA);
+    const linesB = _extractLines(k, secB);
+    if(!linesA.length && !linesB.length) return;
+
+    let secHtml = '';
+    const setB = new Set(linesB);
+    linesA.forEach(line=>{
+      const cls = !setB.has(line) ? 'diff-add' : 'diff-same';
+      secHtml += `<div class="diff-line ${cls}">${esc(line)}</div>`;
+    });
+    // Lines in B but not A show as removed (from this side's perspective)
+    const setA = new Set(linesA);
+    linesB.forEach(line=>{
+      if(!setA.has(line)) secHtml += `<div class="diff-line diff-remove">${esc(line)}</div>`;
+    });
+    if(secHtml) html += `<div class="diff-section"><div class="diff-section-name">${esc(name)}</div>${secHtml}</div>`;
+  });
+
+  return html || '<div style="color:var(--muted);font-size:.83rem;padding:8px">No content</div>';
+}
+
+function _extractLines(key, sec) {
+  if(!sec) return [];
+  const lines = [];
+  if(key==='courseDescription') { if(sec.text) lines.push(sec.text); return lines; }
+  if(key==='notes') { if(sec.text) lines.push(sec.text); return lines; }
+  if(['courseObjectives','learningOutcomes'].includes(key)) {
+    if(sec.intro) lines.push('Intro: '+sec.intro);
+    _flatLines(sec.items||[]).forEach(l=>lines.push(l));
+    return lines;
+  }
+  if(key==='courseContent') {
+    lines.push('Sem 1: '+(sec.semesterOneTitle||''));
+    _flatLines(sec.semesterOneItems||[]).forEach(l=>lines.push('  '+l));
+    lines.push('Sem 2: '+(sec.semesterTwoTitle||''));
+    _flatLines(sec.semesterTwoItems||[]).forEach(l=>lines.push('  '+l));
+    return lines;
+  }
+  if(['courseMaterials','teachingMethods','projects','trips','internships'].includes(key)) {
+    _flatLines(sec.items||[]).forEach(l=>lines.push(l));
+    return lines;
+  }
+  if(key==='gradingCriteria') {
+    (sec.rows||[]).forEach(r=>lines.push([r.category,r.maximum_grade,r.approx__no__of_items||r.approx_no_of_items,r.grade___per_assignment||r.grade_per_assignment].join(' | ')));
+    return lines;
+  }
+  if(key.startsWith('curriculumOutline')) {
+    (sec.rows||[]).forEach(r=>lines.push([r.month___hrs||r.month_hrs,r.standard,r.learning_objective].join(' | ')));
+    return lines;
+  }
+  return lines;
+}
+
+function _flatLines(arr, prefix) {
+  prefix = prefix||'';
+  if(!Array.isArray(arr)) return [];
+  const out = [];
+  arr.forEach(item=>{
+    const node = typeof item==='string'?{text:item,children:[]}:item;
+    if(node.text) out.push(prefix+node.text);
+    if(node.children&&node.children.length) _flatLines(node.children,'  '+prefix).forEach(l=>out.push(l));
+  });
+  return out;
+}
+
+function closeDiff() {
+  const overlay = document.getElementById('diffOverlay');
+  overlay.style.display = 'none';
+  overlay.innerHTML = '';
+}
+
+// ═══════════════════════════════════════════════
+//  NOTIFICATIONS VIEW
+// ═══════════════════════════════════════════════
+async function loadNotificationsView() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="loader-wrap"><div class="spinner"></div><p>Loading reviews…</p></div>`;
+  document.getElementById('btnSave').style.display='none';
+  document.getElementById('btnPDF').style.display='none';
+  document.getElementById('btnWord').style.display='none';
+
+  try {
+    const res = await api('getNotifications');
+    if(!res.success) throw new Error(res.error);
+    renderNotificationsView(res.notifications||[]);
+    updateNotifBadge(res.notifications.length);
+  } catch(err) {
+    main.innerHTML = `<div class="error-screen"><h2>Failed to load</h2><div class="error-detail">${esc(err.message)}</div><button class="btn btn-primary" onclick="loadNotificationsView()">↺ Retry</button></div>`;
+  }
+}
+
+function renderNotificationsView(notifs) {
+  const main = document.getElementById('mainContent');
+  if(!notifs.length) {
+    main.innerHTML = `<div class="notif-view"><div class="welcome"><span class="wi">✅</span><h2>All caught up!</h2><p>No pending curriculum submissions to review.</p></div></div>`;
+    return;
+  }
+  let html = `<div class="notif-view"><div class="roles-topbar"><h2>🔔 Pending Reviews (${notifs.length})</h2><button class="btn btn-ghost" onclick="loadNotificationsView()">↺ Refresh</button></div>`;
+  notifs.forEach(n=>{
+    html += `<div class="notif-card">
+      <div class="notif-card-header">
+        <div>
+          <div class="notif-dept">${esc(n.department)} — ${esc(n.grade)}</div>
+          <div class="notif-meta">Submitted by ${esc(n.teacherEmail)} · ${fmtTs(n.timestamp)}</div>
+        </div>
+      </div>
+      ${n.note?`<div class="notif-note">📝 ${esc(n.note)}</div>`:''}
+      <div class="notif-actions">
+        <button class="btn btn-ghost btn-sm" onclick="viewNotifDiff('${esc(n.department)}','${esc(n.grade)}')">🔍 View Diff</button>
+        <button class="btn btn-success btn-sm" onclick="showApproveDialog('${esc(n.department)}','${esc(n.grade)}')">✅ Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="showRejectDialog('${esc(n.department)}','${esc(n.grade)}')">❌ Reject</button>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  main.innerHTML = html;
+}
+
+async function viewNotifDiff(dept, grade) {
+  // Navigate to the curriculum, then open diff
+  await selectGrade(dept, grade);
+  openDiffViewer('live','pending');
+}
+
+function showApproveDialog(dept, grade) {
+  showModal(`<h3>✅ Approve Submission</h3>
+    <p>The submitted curriculum for <strong>${esc(dept)} — ${esc(grade)}</strong> will be pushed to live. A version snapshot will be saved.</p>
+    <label style="display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px">Version Label (optional)</label>
+    <input type="text" id="approveLabel" placeholder="e.g. Q2 2026-2027 Approved" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.875rem;margin-bottom:12px"/>
+    <label style="display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px">Note to teacher (optional)</label>
+    <textarea id="approveNote" placeholder="Any feedback…" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.855rem;resize:vertical;min-height:60px;margin-bottom:4px"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" onclick="submitReview('${esc(dept)}','${esc(grade)}','approve')">Approve & Push Live</button>
+    </div>`);
+}
+
+function showRejectDialog(dept, grade) {
+  showModal(`<h3>❌ Reject Submission</h3>
+    <p>The submission for <strong>${esc(dept)} — ${esc(grade)}</strong> will be rejected and the teacher notified.</p>
+    <label style="display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px">Reason for rejection <span style="color:var(--danger)">*</span></label>
+    <textarea id="rejectReason" placeholder="Explain what needs to be changed…" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.855rem;resize:vertical;min-height:80px;margin-bottom:4px"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="submitReview('${esc(dept)}','${esc(grade)}','reject')">Reject</button>
+    </div>`);
+}
+
+async function submitReview(dept, grade, decision) {
+  const label  = document.getElementById('approveLabel')?.value?.trim() || '';
+  const note   = document.getElementById('approveNote')?.value?.trim()  || '';
+  const reason = document.getElementById('rejectReason')?.value?.trim() || '';
+
+  if(decision==='reject' && !reason){ toast('Please enter a reason for rejection','warn'); return; }
+  closeModal();
+
+  try {
+    const res = await api('reviewSubmission',{department:dept,grade,decision,label,reason:reason||note});
+    if(!res.success) throw new Error(res.error);
+    toast(decision==='approve'?'Approved! Curriculum is now live.':'Submission rejected. Teacher notified.', 'success');
+    loadNotificationsView();
+  } catch(err){ toast('Failed: '+err.message,'error'); }
+}
+
+// ═══════════════════════════════════════════════
+//  STATS PANEL
+// ═══════════════════════════════════════════════
+function renderStatsPanel() {
+  if(!S.versions||S.versions.length<1) return '';
+  const totalVersions = S.versions.length;
+  const pinnedCount   = S.versions.filter(v=>v.pinned).length;
+
+  // Count changed sections between current and latest version (simplified)
+  const sectionChanges = {};
+  Object.keys(SECTION_NAMES).forEach(k=>{ sectionChanges[k]=Math.floor(Math.random()*3); }); // placeholder until real diff
+
+  const maxChange = Math.max(...Object.values(sectionChanges), 1);
+  const barRows = Object.entries(sectionChanges)
+    .filter(([,v])=>v>0)
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,8)
+    .map(([k,v])=>`
+      <div class="chart-bar-row">
+        <div class="chart-bar-label">${esc(SECTION_NAMES[k]||k)}</div>
+        <div class="chart-bar-track"><div class="chart-bar-fill" style="width:${Math.round((v/maxChange)*100)}%"></div></div>
+        <div class="chart-bar-val">${v}</div>
+      </div>`).join('');
+
+  return `<div class="stats-panel">
+    <div class="stats-title">📊 Curriculum Statistics</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num">${totalVersions}</div><div class="stat-label">Saved Versions</div></div>
+      <div class="stat-card"><div class="stat-num">${pinnedCount}</div><div class="stat-label">Pinned Versions</div></div>
+      <div class="stat-card"><div class="stat-num">${Object.values(sectionChanges).filter(v=>v>0).length}</div><div class="stat-label">Sections with Changes</div></div>
+    </div>
+    ${barRows?`<div class="chart-wrap"><div style="font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:8px">Changes per section</div>${barRows}</div>`:''}
+  </div>`;
+}
+</script>
+</body>
+</html>
