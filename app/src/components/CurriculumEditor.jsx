@@ -14,12 +14,23 @@ import {
 const AUTOSAVE_MS = 1500
 
 export default function CurriculumEditor(props) {
-  const { course, userId, canEdit } = props
+  const { course, userId, canEdit, initialVersionId } = props
   const toast = useToast()
   const [reloadTick, setReloadTick] = useState(0)
   const [state, setState] = useState({ loading: true })
-  const [mode, setMode] = useState('edit') // 'edit' | 'versions'
+  const [mode, setMode] = useState(initialVersionId ? 'versions' : 'edit') // 'edit' | 'versions'
   const [viewing, setViewing] = useState(null)
+
+  // Opened from a notification: show that version (falls back to the list if it is gone).
+  useEffect(() => {
+    if (!initialVersionId) return
+    let cancelled = false
+    supabase.from('curriculum_versions')
+      .select('id, version_number, name, content, author_id, change_note, change_summary, created_at, profiles:author_id(full_name)')
+      .eq('id', initialVersionId).maybeSingle()
+      .then(({ data }) => { if (!cancelled && data) setViewing(data) })
+    return () => { cancelled = true }
+  }, [initialVersionId])
 
   useEffect(() => {
     let cancelled = false

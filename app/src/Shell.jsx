@@ -28,6 +28,7 @@ export default function Shell({ session, profile }) {
 
   const [view, setView] = useState('courses')
   const [courseId, setCourseId] = useState(null)
+  const [target, setTarget] = useState(null) // deep link from a notification: { versionId, nonce }
   const [collapsed, setCollapsed] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
 
   const [reloadTick, setReloadTick] = useState(0)
@@ -61,9 +62,22 @@ export default function Shell({ session, profile }) {
   const course = courses.find(x => x.id === courseId) ?? null
 
   function selectCourse(id) {
+    setTarget(null)
     setCourseId(id)
     setView('courses')
     if (window.matchMedia(MOBILE_QUERY).matches) setCollapsed(true)
+  }
+
+  function openNotification(n) {
+    if (!n.course_id || !courses.some(c => c.id === n.course_id)) return false
+    setCourseId(n.course_id)
+    setView('courses')
+    setTarget({
+      versionId: n.related_table === 'curriculum_versions' ? n.related_id : null,
+      nonce: Date.now(),
+    })
+    if (window.matchMedia(MOBILE_QUERY).matches) setCollapsed(true)
+    return true
   }
 
   async function handleSignOut() {
@@ -103,7 +117,7 @@ export default function Shell({ session, profile }) {
         </nav>
 
         <div className="header-right">
-          <NotificationsPanel userId={userId} />
+          <NotificationsPanel userId={userId} onOpen={openNotification} />
           <div className="user-badge">
             <span className="user-name">{profile.full_name || session.user.email}</span>
             <span className={`role-chip ${roleChipClass(profile.role)}`}>{roleLabel(profile.role)}</span>
@@ -157,7 +171,8 @@ export default function Shell({ session, profile }) {
           {!loading && view === 'courses' && (
             course ? (
               <CoursePanel
-                key={course.id}
+                key={`${course.id}:${target?.nonce ?? 0}`}
+                initialVersionId={target?.versionId ?? null}
                 course={course}
                 department={deptById.get(course.department_id)}
                 gradeById={gradeById}

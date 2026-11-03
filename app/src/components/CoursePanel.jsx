@@ -5,7 +5,7 @@ import CurriculumEditor from './CurriculumEditor'
 import { STAGE_LABELS } from '../stageUtils'
 import { courseLabel } from '../access'
 
-export default function CoursePanel({ course, department, gradeById, userId, isAdmin, isAuditor, reviewer, canEdit }) {
+export default function CoursePanel({ course, department, gradeById, userId, isAdmin, isAuditor, reviewer, canEdit, initialVersionId }) {
   const [tab, setTab] = useState('curriculum')
   const grade = gradeById.get(course.grade_id)
 
@@ -43,6 +43,7 @@ export default function CoursePanel({ course, department, gradeById, userId, isA
           isAdmin={isAdmin}
           isAuditor={isAuditor}
           reviewer={reviewer}
+          initialVersionId={initialVersionId}
         />
       )}
 

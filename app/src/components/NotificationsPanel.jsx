@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabaseClient'
 
-export default function NotificationsPanel({ userId }) {
+export default function NotificationsPanel({ userId, onOpen }) {
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -46,6 +46,11 @@ export default function NotificationsPanel({ userId }) {
     setNotifications(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? read_at })))
   }
 
+  function handleOpen(n) {
+    if (!n.read_at) markAsRead(n.id)
+    if (onOpen?.(n)) setOpen(false)
+  }
+
   const unreadCount = notifications.filter(n => !n.read_at).length
 
   return (
@@ -69,14 +74,18 @@ export default function NotificationsPanel({ userId }) {
           {loading ? <p className="muted">Loading…</p> : (
             <>
               {notifications.map(n => (
-                <div key={n.id} className={`notification-item ${n.read_at ? '' : 'unread'}`}>
+                <div
+                  key={n.id}
+                  className={`notification-item ${n.read_at ? '' : 'unread'}${n.course_id ? ' clickable' : ''}`}
+                  onClick={() => handleOpen(n)}
+                >
                   <div>
                     <strong>{n.title}</strong>
                     <p>{n.message}</p>
                     <span className="muted">{new Date(n.created_at).toLocaleString()}</span>
                   </div>
                   {!n.read_at && (
-                    <button onClick={() => markAsRead(n.id)} className="link-button">Mark read</button>
+                    <button onClick={e => { e.stopPropagation(); markAsRead(n.id) }} className="link-button">Mark read</button>
                   )}
                 </div>
               ))}
