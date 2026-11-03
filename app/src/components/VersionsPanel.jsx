@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../toastContext'
 import { SECTION_LABELS, compareContents } from '../curriculumDiff'
+import PlanDownloadButtons from './PlanDownloadButtons'
 
-export default function VersionsPanel({ course, userId, isAdmin, reviewer, canEdit, onView, onUse }) {
+export default function VersionsPanel({ course, userId, isAdmin, isAuditor, reviewer, canEdit, onView, onUse }) {
   const toast = useToast()
   const [data, setData] = useState({ loading: true, versions: [], officialId: null })
   const [reloadTick, setReloadTick] = useState(0)
@@ -118,6 +119,7 @@ export default function VersionsPanel({ course, userId, isAdmin, reviewer, canEd
               </div>
               <div className="tbl-actions">
                 <button className="btn btn-ghost btn-sm" onClick={() => onView(v)}>View</button>
+                <PlanDownloadButtons table="curriculum_versions" recordId={v.id} isAuditor={isAuditor} />
                 {canEdit && !course.archived_at && (
                   <button className="btn btn-ghost btn-sm" onClick={() => onUse(v)}>Use as my working copy</button>
                 )}

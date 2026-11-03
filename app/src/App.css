@@ -304,7 +304,10 @@
 
 /* ---------- Curriculum editor ---------- */
 .cv-timestamp { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; margin-bottom: 16px; }
-.cv-timestamp .btn { margin-left: auto; }
+.cv-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.cv-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.import-preview { flex: 1 1 100%; margin: 8px 0 0; color: var(--ink); font-size: 0.88rem; }
+.import-preview h3 { margin-bottom: 4px; }
 .ts-label { font-weight: 600; color: var(--ink2); }
 .save-status.save-saved { color: var(--accent2); }
 .save-status.save-dirty { color: var(--amber); }

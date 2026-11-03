@@ -1,6 +1,8 @@
 // supabase/functions/export-document/index.ts
 //
-// POST body: { "table": "curricula" | "weekly_plans", "record_id": "<uuid>", "format": "docx" | "pdf" }
+// POST body: { "table": "curriculum_versions" | "curriculum_working" | "weekly_plans", "record_id": "<uuid>", "format": "docx" | "pdf" }
+//   curriculum_versions: record_id is a version id (access follows the version's RLS)
+//   curriculum_working:  record_id is a course id; exports the caller's own working copy
 //
 // Auditors: PDF only (enforced here, server-side). Every auditor PDF
 // download is logged to downloads_log and emailed (to the auditor and to
@@ -12,7 +14,13 @@ import {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   Table, TableRow, TableCell, WidthType,
 } from "https://esm.sh/docx@8.5.0";
-import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import * as pdfLib from "https://esm.sh/pdf-lib@1.17.1";
+import JSZip from "https://esm.sh/jszip@3.10.1";
+import { TEMPLATE_BASE64 } from "./templateData.ts";
+import { fillDocumentXml, fillFooterXml } from "./curriculumDocx.ts";
+import { buildCurriculumPdf } from "./curriculumPdf.ts";
+
+const { PDFDocument, StandardFonts, rgb } = pdfLib;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -41,7 +49,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     const { table, record_id, format } = await req.json();
 
-    if (!["curricula", "weekly_plans"].includes(table) || !record_id || !["docx", "pdf"].includes(format)) {
+    if (!["curriculum_versions", "curriculum_working", "weekly_plans"].includes(table) || !record_id || !["docx", "pdf"].includes(format)) {
       return new Response(
         JSON.stringify({ error: "Missing or invalid table/record_id/format" }),
         { status: 400, headers: corsHeaders }
@@ -77,22 +85,64 @@ Deno.serve(async (req) => {
     let fileName: string;
     let description: string;
 
-    if (table === "curricula") {
-      const { data: curriculum, error } = await userClient
-        .from("curricula")
-        .select("*, subjects(name, grade_level)")
-        .eq("id", record_id)
-        .single();
+    if (table !== "weekly_plans") {
+      let version: any = null;
+      let courseId: string = record_id;
 
-      if (error || !curriculum) {
-        return new Response(JSON.stringify({ error: "Not found or no access" }), { status: 404, headers: corsHeaders });
+      if (table === "curriculum_versions") {
+        const { data, error } = await userClient
+          .from("curriculum_versions")
+          .select("id, course_id, name, version_number, content")
+          .eq("id", record_id)
+          .maybeSingle();
+        if (error || !data) {
+          return new Response(
+            JSON.stringify({ error: `Version not found or no access${error ? `: ${error.message}` : ""}` }),
+            { status: 404, headers: corsHeaders }
+          );
+        }
+        version = data;
+        courseId = data.course_id;
+      } else {
+        const { data, error } = await userClient
+          .from("curriculum_working_copies")
+          .select("course_id, content")
+          .eq("user_id", user.id)
+          .eq("course_id", record_id)
+          .maybeSingle();
+        if (error || !data) {
+          return new Response(
+            JSON.stringify({ error: "You have no saved working copy for this course yet" }),
+            { status: 404, headers: corsHeaders }
+          );
+        }
+        version = { ...data, name: "Working copy", version_number: null };
       }
 
-      fileName = `${curriculum.title.replace(/[^a-z0-9]+/gi, "_")}.${format}`;
-      description = `Curriculum "${curriculum.title}" (${curriculum.subjects?.name ?? "unknown subject"}, ${curriculum.academic_year ?? "no year"})`;
+      const { data: courseRow } = await userClient
+        .from("courses")
+        .select("name, departments(name), grades(name)")
+        .eq("id", courseId)
+        .maybeSingle();
+      const course: any = courseRow ?? {};
+
+      // Older or partial documents may lack the department/grade, so fall back to the course.
+      const content = {
+        ...version.content,
+        meta: {
+          ...(version.content?.meta ?? {}),
+          department: version.content?.meta?.department || course.departments?.name || course.name || "",
+          grade: version.content?.meta?.grade || course.grades?.name || "",
+        },
+      };
+
+      const label = [content.meta.department, content.meta.grade].filter(Boolean).join(" ") || "Curriculum";
+      const tag = version.version_number ? `v${version.version_number}` : "working_copy";
+      fileName = `${label}_Curriculum_${tag}.${format}`.replace(/[^a-z0-9._-]+/gi, "_");
+      description = `Curriculum "${label}" â€” ${version.version_number ? `v${version.version_number} ${version.name}` : "working copy"}`;
       fileBytes = format === "docx"
-        ? await buildCurriculumDocx(curriculum)
-        : await buildCurriculumPdf(curriculum);
+        ? await buildCurriculumDocx(content)
+        : await buildCurriculumPdfFromTemplate(content);
 
     } else {
       const { data: planRow, error: planError } = await userClient
@@ -130,7 +180,7 @@ Deno.serve(async (req) => {
       const courseName = courseTitle(plan);
       fileName = `WeeklyPlan_Wk${plan.week_number}_${courseName}.${format}`
         .replace(/[^a-z0-9._]+/gi, "_");
-      description = `Weekly lesson plan — Week ${plan.week_number} (Semester ${plan.semester}), ${courseName}, teacher: ${plan.profiles?.full_name ?? "unknown"}`;
+      description = `Weekly lesson plan â€” Week ${plan.week_number} (Semester ${plan.semester}), ${courseName}, teacher: ${plan.profiles?.full_name ?? "unknown"}`;
       fileBytes = format === "docx"
         ? await buildWeeklyPlanDocx(plan, periods ?? [])
         : await buildWeeklyPlanPdf(plan, periods ?? []);
@@ -167,11 +217,11 @@ Deno.serve(async (req) => {
 
 // ---------------- Auditor logging + notification ----------------
 
-// "Department — Grade" for regular courses, or the elective's own name.
+// "Department â€” Grade" for regular courses, or the elective's own name.
 function courseTitle(plan: any): string {
   const c = plan.courses;
   if (!c) return "Course";
-  return c.name ?? [c.departments?.name, c.grades?.name].filter(Boolean).join(" — ");
+  return c.name ?? [c.departments?.name, c.grades?.name].filter(Boolean).join(" â€” ");
 }
 
 async function logAndNotify(args: {
@@ -233,22 +283,21 @@ async function logAndNotify(args: {
 
 // ---------------- DOCX builders ----------------
 
-async function buildCurriculumDocx(c: any): Promise<Uint8Array> {
-  const doc = new Document({
-    sections: [{
-      children: [
-        new Paragraph({ text: c.title, heading: HeadingLevel.TITLE }),
-        new Paragraph({ text: `Subject: ${c.subjects?.name ?? ""}  |  Grade: ${c.subjects?.grade_level ?? ""}  |  Year: ${c.academic_year ?? ""}` }),
-        new Paragraph({ text: "" }),
-        new Paragraph({ text: "Learning Objectives", heading: HeadingLevel.HEADING_2 }),
-        new Paragraph({ text: c.learning_objectives ?? "" }),
-        new Paragraph({ text: "" }),
-        new Paragraph({ text: "Standards", heading: HeadingLevel.HEADING_2 }),
-        new Paragraph({ text: c.standards ?? "" }),
-      ],
-    }],
-  });
-  return await Packer.toBuffer(doc);
+async function buildCurriculumDocx(content: any): Promise<Uint8Array> {
+  const zip = await JSZip.loadAsync(TEMPLATE_BASE64, { base64: true });
+  zip.file("word/document.xml", fillDocumentXml(await zip.file("word/document.xml")!.async("string"), content));
+  for (const name of Object.keys(zip.files)) {
+    if (/^word\/footer\d+\.xml$/.test(name)) {
+      zip.file(name, fillFooterXml(await zip.file(name)!.async("string"), content));
+    }
+  }
+  return await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+}
+
+async function buildCurriculumPdfFromTemplate(content: any): Promise<Uint8Array> {
+  const zip = await JSZip.loadAsync(TEMPLATE_BASE64, { base64: true });
+  const logo = await zip.file("word/media/image1.png")?.async("uint8array");
+  return await buildCurriculumPdf(pdfLib, content, logo);
 }
 
 async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Array> {
@@ -295,32 +344,6 @@ async function buildWeeklyPlanDocx(plan: any, periods: any[]): Promise<Uint8Arra
 }
 
 // ---------------- PDF builders ----------------
-
-async function buildCurriculumPdf(c: any): Promise<Uint8Array> {
-  const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  let page = pdf.addPage();
-  let y = page.getHeight() - 50;
-  const left = 50;
-
-  const writeLine = (text: string, size = 11, useBold = false, gap = 16) => {
-    if (y < 50) { page = pdf.addPage(); y = page.getHeight() - 50; }
-    page.drawText(text, { x: left, y, size, font: useBold ? bold : font, color: rgb(0, 0, 0) });
-    y -= gap;
-  };
-
-  writeLine(c.title, 20, true, 30);
-  writeLine(`Subject: ${c.subjects?.name ?? ""}   Grade: ${c.subjects?.grade_level ?? ""}   Year: ${c.academic_year ?? ""}`);
-  writeLine("");
-  writeLine("Learning Objectives", 14, true, 20);
-  for (const line of wrapText(c.learning_objectives ?? "", 90)) writeLine(line);
-  writeLine("");
-  writeLine("Standards", 14, true, 20);
-  for (const line of wrapText(c.standards ?? "", 90)) writeLine(line);
-
-  return await pdf.save();
-}
 
 async function buildWeeklyPlanPdf(plan: any, periods: any[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();

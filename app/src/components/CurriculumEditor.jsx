@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient'
 import ListEditor from './ListEditor'
 import TableEditor from './TableEditor'
 import VersionsPanel from './VersionsPanel'
+import CurriculumImport from './CurriculumImport'
+import PlanDownloadButtons from './PlanDownloadButtons'
 import { useToast } from '../toastContext'
 import {
   GRADING_COLS, OUTLINE_COLS, normalizeCurriculum, toStorable,
@@ -104,6 +106,7 @@ export default function CurriculumEditor(props) {
             course={course}
             userId={userId}
             isAdmin={props.isAdmin}
+            isAuditor={props.isAuditor}
             reviewer={props.reviewer}
             canEdit={canEdit}
             defaults={defaults}
@@ -145,7 +148,7 @@ export default function CurriculumEditor(props) {
   )
 }
 
-export function EditorBody({ course, department, grade, userId, canEdit, copy, official, snapshot, onReset }) {
+export function EditorBody({ course, department, grade, userId, canEdit, isAuditor, copy, official, snapshot, onReset }) {
   const toast = useToast()
   const readOnly = Boolean(snapshot) || !canEdit || Boolean(course.archived_at)
   const defaults = { department: department.name, grade: grade?.name ?? course.name ?? '' }
@@ -308,6 +311,16 @@ export function EditorBody({ course, department, grade, userId, canEdit, copy, o
     ['academicYear', 'Academic Year', false],
   ]
 
+  // Used by the Word import: replaces the content and saves it straight away.
+  function applyImported(next) {
+    latest.current = next
+    dirty.current = true
+    setContent(next)
+    setStatus('dirty')
+    clearTimeout(timer.current)
+    saveRef.current()
+  }
+
   async function saveVersion(e) {
     e.preventDefault()
     if (!versionName.trim()) return
@@ -335,21 +348,28 @@ export function EditorBody({ course, department, grade, userId, canEdit, copy, o
   return (
     <div>
       {snapshot && (
-        <div className="readonly-banner">
-          👁 Viewing version v{snapshot.version_number} — {snapshot.name}. Saved versions cannot be edited.
+        <div className="readonly-banner cv-banner">
+          <span>👁 Viewing version v{snapshot.version_number} — {snapshot.name}. Saved versions cannot be edited.</span>
+          <span className="cv-actions">
+            <PlanDownloadButtons table="curriculum_versions" recordId={snapshot.id} isAuditor={isAuditor} />
+          </span>
         </div>
       )}
       {readOnly && !snapshot && !course.archived_at && (
-        <div className="readonly-banner">
-          👁 View-only. {official ? `Showing the Current Official version (${officialLabel}).` : 'No official version has been set yet.'}
+        <div className="readonly-banner cv-banner">
+          <span>
+            👁 View-only. {official ? `Showing the Current Official version (${officialLabel}).` : 'No official version has been set yet.'}
+          </span>
+          {official && (
+            <span className="cv-actions">
+              <PlanDownloadButtons table="curriculum_versions" recordId={official.id} isAuditor={isAuditor} />
+            </span>
+          )}
         </div>
       )}
 
       {!readOnly && (
         <div className="cv-timestamp">
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => setVersionForm(v => !v)}>
-            💾 Save as version
-          </button>
           <span className="ts-label">Working copy:</span>
           <span className={`save-status save-${status}`}>
             {status === 'saving' && 'Saving…'}
@@ -362,9 +382,21 @@ export function EditorBody({ course, department, grade, userId, canEdit, copy, o
           <span className="ts-meta">
             {copy ? 'Private to you' : official ? `Started from official ${officialLabel}` : 'Blank template'}
           </span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={resetToOfficial}>
-            ↺ {official ? 'Reset to official' : 'Start over'}
-          </button>
+          <span className="cv-actions">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setVersionForm(v => !v)}>
+              💾 Save as version
+            </button>
+            <CurriculumImport defaults={defaults} getCurrent={() => latest.current} onApply={applyImported} />
+            <PlanDownloadButtons
+              table="curriculum_working"
+              recordId={course.id}
+              isAuditor={false}
+              beforeDownload={() => saveRef.current()}
+            />
+            <button type="button" className="btn btn-ghost btn-sm" onClick={resetToOfficial}>
+              ↺ {official ? 'Reset to official' : 'Start over'}
+            </button>
+          </span>
         </div>
       )}
 
