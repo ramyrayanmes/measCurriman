@@ -391,6 +391,19 @@
 .diff-add { background: #e7f8f0; color: #047857; }
 @media (max-width: 700px) { .compare-head, .compare-cols { grid-template-columns: 1fr; } }
 
+/* ---------- Reports ---------- */
+.report-result { margin-top: 18px; }
+.subject-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin: 14px 0; box-shadow: var(--shadow); }
+.subject-block h3 { margin: 0 0 4px; font-size: 1rem; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 8px 0; }
+.data-table th, .data-table td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+.data-table th { background: var(--bg); }
+.status-ok { color: var(--accent2); font-weight: 600; }
+.status-missing { color: var(--danger); font-weight: 600; }
+.hint { color: var(--muted); font-size: 0.9rem; }
+.report-result .version-list { list-style: none; padding: 0; }
+.report-result .version-list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 4px; background: var(--surface); }
+
 /* ---------- Users ---------- */
 .user-inactive { opacity: 0.7; background: var(--bg); }
 .chip.chip-inactive { margin-left: 8px; background: var(--danger-light); border-color: #fca5a5; color: var(--danger); }

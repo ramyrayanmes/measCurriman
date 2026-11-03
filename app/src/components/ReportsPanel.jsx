@@ -27,7 +27,7 @@ export default function ReportsPanel() {
   const isSunday = weekStart && new Date(weekStart + 'T00:00:00Z').getUTCDay() === 0
 
   async function run(mode) {
-    if (mode === 'send' && !confirm('Send the report to every department head and meas.curricula@mes.edu.eg now?')) return
+    if (mode === 'send' && !confirm('Send the report to every stage head, head of department and meas.curricula@mes.edu.eg now?')) return
     setBusy(mode)
     setError(null)
     setResult(null)
@@ -44,8 +44,8 @@ export default function ReportsPanel() {
     <div>
       <h2>Weekly submission report</h2>
       <p className="hint">
-        The report is emailed automatically every Saturday morning (Cairo time) to each department head and to
-        meas.curricula@mes.edu.eg. Use this page to preview it or send it on demand.
+        The report is emailed automatically every Saturday morning (Cairo time) to the stage heads, heads of
+        department and meas.curricula@mes.edu.eg. Use this page to preview it or send it on demand.
       </p>
 
       <div className="inline-form">
@@ -75,12 +75,12 @@ export default function ReportsPanel() {
              result.mode === 'test' ? 'Test emails (all delivered to you)' : 'Emails sent'}
           </h4>
           {result.emails.length === 0 ? (
-            <p className="muted">Nothing to report — no subjects have assigned teachers or retroactive submissions.</p>
+            <p className="muted">Nothing to report — no courses have assigned teachers, retroactive submissions or new versions.</p>
           ) : (
             <ul className="version-list">
               {result.emails.map((e, i) => (
                 <li key={i}>
-                  <span>{e.to}{e.subjects_count ? ` — ${e.subjects_count} subject(s)` : ''}</span>
+                  <span>{e.to}{e.subjects_count ? ` — ${e.subjects_count} course(s)` : ''}</span>
                   {e.status && <span className={e.status === 'sent' ? 'status-ok' : 'status-missing'}>{e.status}</span>}
                 </li>
               ))}
@@ -88,13 +88,13 @@ export default function ReportsPanel() {
           )}
 
           <h4>Checklist</h4>
-          {result.subjects.map(s => (
-            <div key={s.subject_id} className="subject-block">
+          {result.courses.map(s => (
+            <div key={s.course_id} className="subject-block">
               <h3>
-                {s.subject_name}{s.grade_level ? ` (Grade ${s.grade_level})` : ''} — {s.teachers.filter(t => t.submitted).length} of {s.teachers.length} submitted
+                {s.title} — {s.teachers.filter(t => t.submitted).length} of {s.teachers.length} submitted
               </h3>
               <p className="muted">
-                Department head(s): {s.heads.length ? s.heads.map(h => h.name).join(', ') : 'none assigned'}
+                Reviewer(s): {s.heads.length ? s.heads.map(h => h.name).join(', ') : 'none assigned'}
               </p>
               <table className="data-table">
                 <thead><tr><th>Teacher</th><th>Status</th><th>Plan(s)</th></tr></thead>
@@ -119,6 +119,18 @@ export default function ReportsPanel() {
                       <li key={i}>
                         {x.teacher} — Week {x.week_number} (Sem {x.semester}): {x.date_from} to {x.date_to},
                         created {new Date(x.created_at).toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {s.versions.length > 0 && (
+                <>
+                  <p><strong>Curriculum versions saved this week</strong></p>
+                  <ul>
+                    {s.versions.map((v, i) => (
+                      <li key={i}>
+                        v{v.version_number} “{v.name}” by {v.author}, {new Date(v.created_at).toLocaleString()}
                       </li>
                     ))}
                   </ul>

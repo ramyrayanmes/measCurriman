@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import CoursePanel from './components/CoursePanel'
 import ManageDepartments from './components/ManageDepartments'
 import UsersManager from './components/UsersManager'
+import ReportsPanel from './components/ReportsPanel'
 import { LOGO_URL } from './branding'
 import NotificationsPanel from './components/NotificationsPanel'
 import ChangePasswordPanel from './components/ChangePasswordPanel'
@@ -94,6 +95,11 @@ export default function Shell({ session, profile }) {
               👥 <span className="nav-label">Users</span>
             </button>
           )}
+          {admin && (
+            <button className={`nav-tab admin-tab${view === 'reports' ? ' active' : ''}`} onClick={() => setView('reports')}>
+              📊 <span className="nav-label">Reports</span>
+            </button>
+          )}
         </nav>
 
         <div className="header-right">
@@ -145,6 +151,8 @@ export default function Shell({ session, profile }) {
           {!loading && view === 'users' && admin && (
             <UsersManager departments={departments} courses={courses} grades={grades} currentUserId={userId} />
           )}
+
+          {!loading && view === 'reports' && admin && <ReportsPanel />}
 
           {!loading && view === 'courses' && (
             course ? (

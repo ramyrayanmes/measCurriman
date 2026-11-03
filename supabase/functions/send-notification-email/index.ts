@@ -1,50 +1,92 @@
 // supabase/functions/send-notification-email/index.ts
 //
-// Triggered by a Database Webhook whenever a new row is inserted into
-// `notifications` (which itself happens automatically via a trigger whenever
-// a curriculum_versions or weekly_plan_versions row is created).
+// Triggered by a Database Webhook (INSERT on public.notifications). Emails the
+// recipient about a new named curriculum version or a new official version.
+// Inactive recipients are skipped.
 //
-// It looks up the two most recent versions for that record, builds a simple
-// human-readable diff, looks up the recipient admin's email, and sends it
-// via Gmail SMTP.
+// Optional secret: APP_URL (adds a link to the app at the end of the email).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
+const SECTION_LABELS: Record<string, string> = {
+  courseDescription: "Course description",
+  courseObjectives: "Course objectives",
+  learningOutcomes: "Learning outcomes",
+  courseContent: "Course content",
+  teachingMethods: "Teaching methods",
+  projects: "Projects",
+  trips: "Trips",
+  gradingCriteria: "Grading criteria",
+  curriculumOutlineSemesterOne: "Outline - Semester 1",
+  curriculumOutlineSemesterTwo: "Outline - Semester 2",
+  meta: "Details",
+  courseMaterials: "Materials & Resources",
+  internships: "Internships & Events",
+  notes: "Notes & Changes",
+};
+
+function asciiOnly(s: string): string {
+  return s.replace(/[\u2012-\u2015]/g, "-").replace(/[^\x20-\x7E]/g, "");
+}
+
+function cleanText(t: string): string {
+  return t.replace(/[ \t]+$/gm, "");
+}
+
 Deno.serve(async (req) => {
   try {
     const payload = await req.json();
-    const notification = payload.record; // the newly inserted notifications row
+    const n = payload.record;
+    if (!n?.recipient_id) {
+      return new Response(JSON.stringify({ skipped: "no notification record" }), { status: 200 });
+    }
 
-    const supabase = createClient(
+    const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // 1. Figure out which versions table to compare, based on related_table
-    const isCurriculum = notification.related_table === "curricula";
-    const versionsTable = isCurriculum ? "curriculum_versions" : "weekly_plan_versions";
-    const idColumn = isCurriculum ? "curriculum_id" : "weekly_plan_id";
+    const { data: recipient } = await admin
+      .from("profiles").select("email, full_name, active").eq("id", n.recipient_id).single();
+    if (!recipient?.email) throw new Error("Recipient has no email on file");
+    if (recipient.active === false) {
+      return new Response(JSON.stringify({ skipped: "recipient inactive" }), { status: 200 });
+    }
 
-    const { data: versions, error: versionsError } = await supabase
-      .from(versionsTable)
-      .select("*")
-      .eq(idColumn, notification.related_id)
-      .order("version_number", { ascending: false })
-      .limit(2);
+    let courseTitle = "";
+    if (n.course_id) {
+      const { data: c } = await admin
+        .from("courses")
+        .select("name, departments(name), grades(name)")
+        .eq("id", n.course_id).single();
+      if (c) courseTitle = `${c.departments?.name ?? ""} - ${c.grades?.name ?? c.name ?? ""}`;
+    }
 
-    if (versionsError) throw versionsError;
+    const lines: string[] = [n.message ?? ""];
+    if (courseTitle) lines.push(`Course: ${courseTitle}`);
 
-    const diffText = buildDiff(versions?.[1]?.snapshot, versions?.[0]?.snapshot, isCurriculum);
+    if (n.related_table === "curriculum_versions" && n.related_id) {
+      const { data: v } = await admin
+        .from("curriculum_versions")
+        .select("name, version_number, change_note, change_summary, created_at, author:profiles!curriculum_versions_author_id_fkey(full_name, email)")
+        .eq("id", n.related_id).single();
+      if (v) {
+        lines.push(`Version: #${v.version_number} "${v.name}"`);
+        lines.push(`Saved by: ${v.author?.full_name || v.author?.email || "unknown"}`);
+        if (n.type === "new_version") {
+          const changed = (v.change_summary ?? []).map((k: string) =>
+            k === "first version" ? "first version" : (SECTION_LABELS[k] ?? k));
+          lines.push(`Sections changed: ${changed.length ? changed.join(", ") : "none"}`);
+          if (v.change_note) lines.push(`Note from author: ${v.change_note}`);
+        }
+      }
+    }
 
-    // 2. Look up the recipient admin's email address
-    const { data: userData, error: userError } =
-      await supabase.auth.admin.getUserById(notification.recipient_id);
-    if (userError) throw userError;
-    const recipientEmail = userData.user?.email;
-    if (!recipientEmail) throw new Error("Recipient has no email on file");
+    const appUrl = Deno.env.get("APP_URL");
+    if (appUrl) lines.push("", `Open CurriMan: ${appUrl}`);
+    lines.push("", "-- CurriMan, Modern Education American School");
 
-    // 3. Send the email via Gmail SMTP
     const client = new SMTPClient({
       connection: {
         hostname: "smtp.gmail.com",
@@ -56,14 +98,12 @@ Deno.serve(async (req) => {
         },
       },
     });
-
     await client.send({
       from: Deno.env.get("GMAIL_ADDRESS")!,
-      to: recipientEmail,
-      subject: `CurriMan: ${notification.title}`,
-      content: `CurriMan notification\n\n${notification.message}\n\nWhat changed:\n${diffText}\n\n-- CurriMan, Modern Education American School`,
+      to: recipient.email,
+      subject: asciiOnly(`CurriMan: ${n.title}${courseTitle ? ` (${courseTitle})` : ""}`),
+      content: cleanText(lines.join("\n")),
     });
-
     await client.close();
 
     return new Response(JSON.stringify({ sent: true }), { status: 200 });
@@ -72,36 +112,3 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
   }
 });
-
-// Builds a simple, readable list of which fields changed between two
-// snapshot objects. Ignores noisy/internal fields like timestamps and ids.
-function buildDiff(oldSnap: any, newSnap: any, isCurriculum: boolean): string {
-  if (!oldSnap) return "This is the first saved version — no prior version to compare.";
-
-  const ignoreFields = ["id", "created_at", "updated_at", "created_by", "updated_by"];
-  const lines: string[] = [];
-
-  if (isCurriculum) {
-    for (const key of Object.keys(newSnap)) {
-      if (ignoreFields.includes(key)) continue;
-      if (JSON.stringify(oldSnap[key]) !== JSON.stringify(newSnap[key])) {
-        lines.push(`- ${key}: "${oldSnap[key] ?? ""}" → "${newSnap[key] ?? ""}"`);
-      }
-    }
-  } else {
-    // weekly_plan snapshot shape: { plan: {...}, periods: [...] }
-    for (const key of Object.keys(newSnap.plan)) {
-      if (ignoreFields.includes(key)) continue;
-      if (JSON.stringify(oldSnap.plan[key]) !== JSON.stringify(newSnap.plan[key])) {
-        lines.push(`- plan.${key}: "${oldSnap.plan[key] ?? ""}" → "${newSnap.plan[key] ?? ""}"`);
-      }
-    }
-    const oldCount = oldSnap.periods?.length ?? 0;
-    const newCount = newSnap.periods?.length ?? 0;
-    if (oldCount !== newCount) {
-      lines.push(`- number of lesson periods: ${oldCount} → ${newCount}`);
-    }
-  }
-
-  return lines.length ? lines.join("\n") : "No field-level changes detected.";
-}

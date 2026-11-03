@@ -1,16 +1,21 @@
 // supabase/functions/weekly-compliance-report/index.ts
 //
-// Builds, per subject, a checklist of which assigned teachers submitted a
-// weekly lesson plan covering the Sunday–Thursday week, plus a list of
-// retroactive submissions (plans created during the report week whose dates
-// fall in an earlier week).
+// Weekly report, per course (department + grade):
+//   - which assigned teachers submitted a weekly lesson plan covering the
+//     Sunday-Thursday week,
+//   - retroactive submissions (plans created during the report week whose
+//     dates fall in an earlier week),
+//   - named curriculum versions saved during the week.
+//
+// Recipients: stage heads (their stage), heads of department (their courses),
+// and meas.curricula@mes.edu.eg (everything). Inactive users are skipped.
 //
 // Two ways to call it:
 //   1. Cron:  header  x-cron-secret: <CRON_SECRET>   (always sends for real unless body.mode = "test")
 //   2. Admin: normal login token, body { mode: "preview" | "test" | "send", week_start?: "YYYY-MM-DD" }
 //        preview = return the report as JSON, send nothing
 //        test    = send every email, but only to the calling admin
-//        send    = send for real to the heads and meas.curricula@mes.edu.eg
+//        send    = send for real
 //
 // Deploy with:  supabase functions deploy weekly-compliance-report --no-verify-jwt
 
@@ -73,8 +78,7 @@ function fmtCreated(iso: string): string {
   return new Date(iso).toLocaleString("en-GB", { timeZone: TZ, dateStyle: "medium", timeStyle: "short" });
 }
 
-// Short, plain-ASCII range for email subjects (no special dash characters,
-// which have to be header-encoded and break on long lines).
+// Short, plain-ASCII range for email subjects.
 function shortRange(start: string, end: string): string {
   const a = new Date(start + "T00:00:00Z").toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short" });
   const b = new Date(end + "T00:00:00Z").toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" });
@@ -107,18 +111,20 @@ async function buildReport(admin: any, weekStart: string) {
   const createdFrom = cairoMidnightUtc(weekStart);
   const createdTo = cairoMidnightUtc(addDays(weekStart, 7));
 
-  const [{ data: subjects }, { data: ts }, { data: dhs }, { data: profiles }] = await Promise.all([
-    admin.from("subjects").select("id, name, grade_level").order("name"),
-    admin.from("teacher_subjects").select("teacher_id, subject_id"),
-    admin.from("department_head_subjects").select("user_id, subject_id"),
-    admin.from("profiles").select("id, full_name, email"),
+  const [{ data: courses }, { data: assigns }, { data: profiles }] = await Promise.all([
+    admin.from("courses")
+      .select("id, name, stage, departments(name, sort_order), grades(name, sort_order)")
+      .is("archived_at", null),
+    admin.from("course_assignments").select("user_id, course_id, kind"),
+    admin.from("profiles").select("id, full_name, email, role, active"),
   ]);
 
   const profileById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p]));
+  const isActive = (id: string) => profileById.get(id)?.active !== false;
 
-  const planCols = "id, subject_id, teacher_id, week_number, semester, date_from, date_to, created_at";
+  const planCols = "id, course_id, teacher_id, week_number, semester, date_from, date_to, created_at";
 
-  // Plans whose date range overlaps the Sunday–Thursday week
+  // Plans whose date range overlaps the Sunday-Thursday week
   const { data: weekPlans } = await admin
     .from("weekly_plans").select(planCols)
     .lte("date_from", weekEnd).gte("date_to", weekStart);
@@ -129,17 +135,32 @@ async function buildReport(admin: any, weekStart: string) {
     .gte("created_at", createdFrom).lt("created_at", createdTo)
     .lt("date_to", weekStart);
 
-  const reports = (subjects ?? []).map((s: any) => {
-    const teacherIds = (ts ?? []).filter((r: any) => r.subject_id === s.id).map((r: any) => r.teacher_id);
-    const headIds = (dhs ?? []).filter((r: any) => r.subject_id === s.id).map((r: any) => r.user_id);
+  // Named versions saved during the report week
+  const { data: weekVersions } = await admin
+    .from("curriculum_versions")
+    .select("course_id, version_number, name, author_id, change_summary, created_at")
+    .gte("created_at", createdFrom).lt("created_at", createdTo)
+    .order("created_at");
 
-    const teachers = teacherIds.map((id: string) => {
-      const p = profileById.get(id);
-      const plans = (weekPlans ?? []).filter((w: any) => w.subject_id === s.id && w.teacher_id === id);
+  const person = (id: string) => {
+    const p = profileById.get(id);
+    return { id, name: p?.full_name || p?.email || "(unknown)", email: p?.email ?? "" };
+  };
+
+  const sorted = [...(courses ?? [])].sort((a: any, b: any) =>
+    (a.departments?.sort_order ?? 0) - (b.departments?.sort_order ?? 0) ||
+    String(a.departments?.name ?? "").localeCompare(String(b.departments?.name ?? "")) ||
+    (a.grades?.sort_order ?? 0) - (b.grades?.sort_order ?? 0));
+
+  const reports = sorted.map((c: any) => {
+    const title = `${c.departments?.name ?? ""} - ${c.grades?.name ?? c.name ?? ""}`;
+    const forCourse = (kind: string) =>
+      (assigns ?? []).filter((a: any) => a.course_id === c.id && a.kind === kind && isActive(a.user_id));
+
+    const teachers = forCourse("teacher").map((a: any) => {
+      const plans = (weekPlans ?? []).filter((w: any) => w.course_id === c.id && w.teacher_id === a.user_id);
       return {
-        id,
-        name: p?.full_name ?? "(unknown)",
-        email: p?.email ?? "",
+        ...person(a.user_id),
         submitted: plans.length > 0,
         plans: plans.map((w: any) => ({
           week_number: w.week_number, semester: w.semester, date_from: w.date_from, date_to: w.date_to,
@@ -148,55 +169,69 @@ async function buildReport(admin: any, weekStart: string) {
     });
 
     const retroactive = (retroPlans ?? [])
-      .filter((w: any) => w.subject_id === s.id)
+      .filter((w: any) => w.course_id === c.id)
       .map((w: any) => ({
-        teacher: profileById.get(w.teacher_id)?.full_name ?? "(unknown)",
+        teacher: person(w.teacher_id).name,
         week_number: w.week_number, semester: w.semester,
         date_from: w.date_from, date_to: w.date_to,
         created_at: w.created_at,
       }));
 
-    const heads = headIds.map((id: string) => {
-      const p = profileById.get(id);
-      return { id, name: p?.full_name ?? "(unknown)", email: p?.email ?? "" };
-    });
+    const versions = (weekVersions ?? [])
+      .filter((v: any) => v.course_id === c.id)
+      .map((v: any) => ({
+        version_number: v.version_number, name: v.name, author: person(v.author_id).name,
+        created_at: v.created_at, changed: v.change_summary ?? [],
+      }));
+
+    // Reviewers: the stage head(s) plus heads of this department/grade
+    const headIds = new Set<string>();
+    for (const p of profiles ?? []) {
+      if (p.active !== false && p.role === `head_${c.stage}`) headIds.add(p.id);
+    }
+    for (const a of forCourse("dept_head")) headIds.add(a.user_id);
 
     return {
-      subject_id: s.id, subject_name: s.name, grade_level: s.grade_level,
-      heads, teachers, retroactive,
+      course_id: c.id, title, stage: c.stage,
+      heads: [...headIds].map(person), teachers, retroactive, versions,
     };
-  }).filter((r: any) => r.teachers.length > 0 || r.retroactive.length > 0);
+  }).filter((r: any) => r.teachers.length > 0 || r.retroactive.length > 0 || r.versions.length > 0);
 
   return { weekEnd, reports };
 }
 
 // ---------------- rendering ----------------
 
-function subjectTitle(r: any): string {
-  return `${r.subject_name}${r.grade_level ? ` (Grade ${r.grade_level})` : ""}`;
-}
-
 function planLabel(p: any): string {
   return `Week ${p.week_number} (Sem ${p.semester}): ${p.date_from} to ${p.date_to}`;
 }
 
-function renderSubjectHtml(r: any, showHeads: boolean): string {
+function versionLabel(v: any): string {
+  return `v${v.version_number} "${v.name}" by ${v.author}, ${fmtCreated(v.created_at)}`;
+}
+
+function renderCourseHtml(r: any, showHeads: boolean): string {
   const submittedCount = r.teachers.filter((t: any) => t.submitted).length;
   const rows = r.teachers.map((t: any) => `
     <tr>
       <td>${esc(t.name)}</td>
-      <td style="color:${t.submitted ? "#16a34a" : "#dc2626"}">${t.submitted ? "✓ Submitted" : "✗ Not submitted"}</td>
-      <td>${t.submitted ? t.plans.map((p: any) => esc(planLabel(p))).join("<br>") : "—"}</td>
+      <td style="color:${t.submitted ? "#16a34a" : "#dc2626"}">${t.submitted ? "&#10003; Submitted" : "&#10007; Not submitted"}</td>
+      <td>${t.submitted ? t.plans.map((p: any) => esc(planLabel(p))).join("<br>") : "-"}</td>
     </tr>`).join("");
 
   const heads = showHeads
-    ? `<p style="color:#666;margin:2px 0 8px">Department head(s): ${r.heads.length ? r.heads.map((h: any) => esc(h.name)).join(", ") : "none assigned"}</p>`
+    ? `<p style="color:#666;margin:2px 0 8px">Reviewer(s): ${r.heads.length ? r.heads.map((h: any) => esc(h.name)).join(", ") : "none assigned"}</p>`
     : "";
 
   const retro = r.retroactive.length
     ? `<p style="margin:12px 0 4px"><strong>Retroactive submissions</strong> (created this week for earlier weeks):</p>
        <ul style="margin:0">${r.retroactive.map((x: any) =>
-         `<li>${esc(x.teacher)} — ${esc(planLabel(x))} — created ${esc(fmtCreated(x.created_at))}</li>`).join("")}</ul>`
+         `<li>${esc(x.teacher)} - ${esc(planLabel(x))} - created ${esc(fmtCreated(x.created_at))}</li>`).join("")}</ul>`
+    : "";
+
+  const versions = r.versions.length
+    ? `<p style="margin:12px 0 4px"><strong>Curriculum versions saved this week</strong></p>
+       <ul style="margin:0">${r.versions.map((v: any) => `<li>${esc(versionLabel(v))}</li>`).join("")}</ul>`
     : "";
 
   const table = r.teachers.length
@@ -204,40 +239,44 @@ function renderSubjectHtml(r: any, showHeads: boolean): string {
          <tr style="background:#f3f4f6"><th align="left">Teacher</th><th align="left">Status</th><th align="left">Plan(s) covering this week</th></tr>
          ${rows}
        </table>`
-    : `<p style="color:#666">No teachers assigned to this subject.</p>`;
+    : `<p style="color:#666">No teachers assigned to this course.</p>`;
 
-  return `<h3 style="margin:20px 0 4px">${esc(subjectTitle(r))} — ${submittedCount} of ${r.teachers.length} submitted</h3>
-    ${heads}${table}${retro}`;
+  return `<h3 style="margin:20px 0 4px">${esc(r.title)} - ${submittedCount} of ${r.teachers.length} submitted</h3>
+    ${heads}${table}${retro}${versions}`;
 }
 
-function renderSubjectText(r: any, showHeads: boolean): string {
+function renderCourseText(r: any, showHeads: boolean): string {
   const submittedCount = r.teachers.filter((t: any) => t.submitted).length;
-  const lines = [`${subjectTitle(r)} — ${submittedCount} of ${r.teachers.length} submitted`];
-  if (showHeads) lines.push(`  Department head(s): ${r.heads.length ? r.heads.map((h: any) => h.name).join(", ") : "none assigned"}`);
+  const lines = [`${r.title} - ${submittedCount} of ${r.teachers.length} submitted`];
+  if (showHeads) lines.push(`  Reviewer(s): ${r.heads.length ? r.heads.map((h: any) => h.name).join(", ") : "none assigned"}`);
   for (const t of r.teachers) {
-    lines.push(`  ${t.submitted ? "[x]" : "[ ]"} ${t.name}${t.submitted ? " — " + t.plans.map(planLabel).join("; ") : " — not submitted"}`);
+    lines.push(`  ${t.submitted ? "[x]" : "[ ]"} ${t.name}${t.submitted ? " - " + t.plans.map(planLabel).join("; ") : " - not submitted"}`);
   }
   if (r.retroactive.length) {
     lines.push("  Retroactive submissions (created this week for earlier weeks):");
-    for (const x of r.retroactive) lines.push(`    - ${x.teacher} — ${planLabel(x)} — created ${fmtCreated(x.created_at)}`);
+    for (const x of r.retroactive) lines.push(`    - ${x.teacher} - ${planLabel(x)} - created ${fmtCreated(x.created_at)}`);
+  }
+  if (r.versions.length) {
+    lines.push("  Curriculum versions saved this week:");
+    for (const v of r.versions) lines.push(`    - ${versionLabel(v)}`);
   }
   return lines.join("\n");
 }
 
 function planEmails(reports: any[], weekStart: string, weekEnd: string) {
-  const label = `${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`;
+  const label = `${fmtDate(weekStart)} - ${fmtDate(weekEnd)}`;
   const subject = `CurriMan weekly report: ${shortRange(weekStart, weekEnd)}`;
   const wrap = (intro: string, body: string) =>
     `<div style="font-family:Arial,sans-serif">
        <p style="margin:0;font-size:13px;font-weight:bold;color:#1a56db">CurriMan</p>
-       <h2 style="margin-bottom:4px">Weekly lesson plan submission report</h2>
-       <p style="color:#666;margin-top:0">${esc(label)} (Sunday–Thursday). ${esc(intro)}</p>
+       <h2 style="margin-bottom:4px">Weekly lesson plan and curriculum report</h2>
+       <p style="color:#666;margin-top:0">${esc(label)} (Sunday-Thursday). ${esc(intro)}</p>
        ${body}
      </div>`;
 
   const emails: any[] = [];
 
-  // One email per department head, covering all of their subjects
+  // One email per reviewer, covering all of their courses
   const byHead = new Map<string, { name: string; email: string; reports: any[] }>();
   for (const r of reports) {
     for (const h of r.heads) {
@@ -252,8 +291,8 @@ function planEmails(reports: any[], weekStart: string, weekEnd: string) {
       to: h.email,
       subject,
       subjects_count: h.reports.length,
-      html: wrap("Here is the submission status for the subject(s) you head.", h.reports.map(r => renderSubjectHtml(r, false)).join("")),
-      text: `CurriMan - Weekly lesson plan submissions — ${label}\n\n` + h.reports.map(r => renderSubjectText(r, false)).join("\n\n"),
+      html: wrap("Status of the course(s) you oversee.", h.reports.map(r => renderCourseHtml(r, false)).join("")),
+      text: `CurriMan - Weekly report - ${label}\n\n` + h.reports.map(r => renderCourseText(r, false)).join("\n\n"),
     });
   }
 
@@ -261,10 +300,10 @@ function planEmails(reports: any[], weekStart: string, weekEnd: string) {
   if (reports.length > 0) {
     emails.push({
       to: SUMMARY_ADDRESS,
-      subject: `${subject} (all subjects)`,
+      subject: `${subject} (all courses)`,
       subjects_count: reports.length,
-      html: wrap("Consolidated report for all subjects.", reports.map(r => renderSubjectHtml(r, true)).join("")),
-      text: `CurriMan - Weekly lesson plan submissions — ${label} (all subjects)\n\n` + reports.map(r => renderSubjectText(r, true)).join("\n\n"),
+      html: wrap("Consolidated report for all courses.", reports.map(r => renderCourseHtml(r, true)).join("")),
+      text: `CurriMan - Weekly report - ${label} (all courses)\n\n` + reports.map(r => renderCourseText(r, true)).join("\n\n"),
     });
   }
 
@@ -305,8 +344,8 @@ Deno.serve(async (req) => {
       if (userError || !user) {
         return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: corsHeaders });
       }
-      const { data: profile } = await userClient.from("profiles").select("role, email").eq("id", user.id).single();
-      if (profile?.role !== "admin") {
+      const { data: profile } = await userClient.from("profiles").select("role, email, active").eq("id", user.id).single();
+      if (profile?.role !== "admin" || profile?.active === false) {
         return new Response(JSON.stringify({ error: "Only admins may run this report" }), { status: 403, headers: corsHeaders });
       }
       testRecipient = profile.email ?? user.email ?? null;
@@ -335,7 +374,7 @@ Deno.serve(async (req) => {
     if (mode === "preview") {
       return new Response(
         JSON.stringify({
-          week_start: weekStart, week_end: weekEnd, subjects: reports,
+          week_start: weekStart, week_end: weekEnd, courses: reports,
           emails: emails.map(e => ({ to: e.to, subject: e.subject, subjects_count: e.subjects_count })),
         }),
         { status: 200, headers: corsHeaders }
@@ -368,7 +407,7 @@ Deno.serve(async (req) => {
       const text = cleanText(rawText);
       try {
         await client.send({ from: Deno.env.get("GMAIL_ADDRESS")!, to: actualTo, subject, content: text, html });
-        sent.push({ to: e.to, delivered_to: actualTo, status: "sent" });
+        sent.push({ to: e.to, delivered_to: actualTo, status: "sent", subjects_count: e.subjects_count });
       } catch (err) {
         console.error("Failed to send to", actualTo, err);
         sent.push({ to: e.to, delivered_to: actualTo, status: "failed", error: String(err) });
@@ -377,7 +416,7 @@ Deno.serve(async (req) => {
     await client.close();
 
     return new Response(
-      JSON.stringify({ week_start: weekStart, week_end: weekEnd, mode, subjects: reports, emails: sent }),
+      JSON.stringify({ week_start: weekStart, week_end: weekEnd, mode, courses: reports, emails: sent }),
       { status: 200, headers: corsHeaders }
     );
   } catch (err) {
