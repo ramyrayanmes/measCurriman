@@ -35,6 +35,12 @@ function cleanText(t: string): string {
 }
 
 Deno.serve(async (req) => {
+  const expected = Deno.env.get("WEBHOOK_SECRET");
+  const provided = req.headers.get("x-webhook-secret");
+  if (!expected || provided !== expected) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  }
+
   try {
     const payload = await req.json();
     const n = payload.record;
