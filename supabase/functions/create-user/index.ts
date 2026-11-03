@@ -36,8 +36,13 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { email, full_name, role } = body;
     const resetUserId: string | undefined = body.action === "reset_password" ? body.user_id : undefined;
+    const manageAction: string | undefined = ["set_active", "delete_user"].includes(body.action) ? body.action : undefined;
 
-    if (!resetUserId && (!email || !full_name || !VALID_ROLES.includes(role))) {
+    if (manageAction && !body.user_id) {
+      return new Response(JSON.stringify({ error: "Missing user_id" }), { status: 400, headers: corsHeaders });
+    }
+
+    if (!resetUserId && !manageAction && (!email || !full_name || !VALID_ROLES.includes(role))) {
       return new Response(
         JSON.stringify({ error: "Missing or invalid email/full_name/role" }),
         { status: 400, headers: corsHeaders }
@@ -69,6 +74,55 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    if (manageAction) {
+      const targetId: string = body.user_id;
+      if (targetId === user.id) {
+        return new Response(
+          JSON.stringify({ error: "You cannot deactivate or delete your own account" }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      if (manageAction === "set_active") {
+        const active = Boolean(body.active);
+        // A ban stops sign-in and token refresh; the profile flag removes data access.
+        const { error: banError } = await adminClient.auth.admin.updateUserById(
+          targetId,
+          { ban_duration: active ? "none" : "876000h" },
+        );
+        if (banError) throw banError;
+        const { error: flagError } = await adminClient.from("profiles").update({ active }).eq("id", targetId);
+        if (flagError) throw flagError;
+        return new Response(JSON.stringify({ user_id: targetId, active }), { status: 200, headers: corsHeaders });
+      }
+
+      // delete_user: refuse when the person authored records that must be kept.
+      const checks: [string, string, string][] = [
+        ["curriculum_versions", "author_id", "saved curriculum versions"],
+        ["official_versions", "set_by", "official-version changes"],
+        ["version_comments", "author_id", "version comments"],
+        ["weekly_plans", "teacher_id", "weekly plans"],
+      ];
+      for (const [table, column, label] of checks) {
+        const { count, error: countError } = await adminClient
+          .from(table).select("*", { count: "exact", head: true }).eq(column, targetId);
+        if (countError) throw countError;
+        if ((count ?? 0) > 0) {
+          return new Response(
+            JSON.stringify({
+              error: `This user has ${count} ${label} that must be kept. Deactivate the account instead of deleting it.`,
+            }),
+            { status: 409, headers: corsHeaders }
+          );
+        }
+      }
+
+      // Deleting the auth user also removes the profile, working copies, assignments and notifications.
+      const { error: deleteError } = await adminClient.auth.admin.deleteUser(targetId);
+      if (deleteError) throw deleteError;
+      return new Response(JSON.stringify({ user_id: targetId, deleted: true }), { status: 200, headers: corsHeaders });
+    }
 
     const tempPassword = generateTempPassword();
 

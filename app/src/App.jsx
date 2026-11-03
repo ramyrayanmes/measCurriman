@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Shell from './Shell'
 import Brand from './components/Brand'
+import { LOGO_URL } from './branding'
 import { APP_NAME, APP_VERSION, SCHOOL_NAME } from './version'
 import './App.css'
 
@@ -35,7 +36,7 @@ export default function App() {
     let cancelled = false
     supabase
       .from('profiles')
-      .select('full_name, role, email')
+      .select('full_name, role, email, active')
       .eq('id', userId)
       .single()
       .then(({ data, error }) => {
@@ -74,7 +75,7 @@ function Login() {
 
   return (
     <div className="login-container">
-      <img src="/meas-logo-small.png" alt="MEAS" className="login-logo" />
+      <img src={LOGO_URL} alt="MEAS" className="login-logo" />
       <h1 className="login-title"><Brand /></h1>
       <p className="login-sub">{SCHOOL_NAME}</p>
       <form onSubmit={handleSubmit} className="login-form">
@@ -94,6 +95,18 @@ function Login() {
 }
 
 function ProfileGate({ session, profile, profileError }) {
+  const inactive = profile?.active === false
+
+  if (inactive) {
+    return (
+      <div className="welcome">
+        <span className="wi">🚫</span>
+        <h2>Account inactive</h2>
+        <p>Your account has been deactivated. Please contact an administrator.</p>
+        <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
+      </div>
+    )
+  }
   if (profile) return <Shell session={session} profile={profile} />
 
   return (

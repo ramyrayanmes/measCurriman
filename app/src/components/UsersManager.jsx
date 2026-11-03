@@ -11,7 +11,7 @@ const ALL_ROLES = ['admin', 'teacher', 'auditor', 'head_department', 'head_kinde
 const KIND_LABELS = { teacher: 'Teacher', auditor: 'Auditor', dept_head: 'Head of Department' }
 const ALL = '__all__'
 
-export default function UsersManager({ departments, courses, grades }) {
+export default function UsersManager({ departments, courses, grades, currentUserId }) {
   const toast = useToast()
   const [users, setUsers] = useState([])
   const [assignments, setAssignments] = useState([])
@@ -19,6 +19,7 @@ export default function UsersManager({ departments, courses, grades }) {
   const [error, setError] = useState(null)
   const [reloadTick, setReloadTick] = useState(0)
   const [filter, setFilter] = useState('')
+  const [showInactive, setShowInactive] = useState(false)
   const [openUserId, setOpenUserId] = useState(null)
 
   const [newEmail, setNewEmail] = useState('')
@@ -36,7 +37,7 @@ export default function UsersManager({ departments, courses, grades }) {
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      supabase.from('profiles').select('id, full_name, email, role').order('full_name', { ascending: true }),
+      supabase.from('profiles').select('id, full_name, email, role, active').order('full_name', { ascending: true }),
       supabase.from('course_assignments').select('user_id, course_id, kind'),
     ]).then(([u, a]) => {
       if (cancelled) return
@@ -109,9 +110,44 @@ export default function UsersManager({ departments, courses, grades }) {
     }
   }
 
+  async function handleSetActive(user, active) {
+    const msg = active
+      ? `Reactivate ${user.email}? They will be able to sign in again.`
+      : `Deactivate ${user.email}? They will be signed out and unable to sign in, but everything they created is kept.`
+    if (!window.confirm(msg)) return
+    try {
+      await callEdgeFunctionJson('create-user', { action: 'set_active', user_id: user.id, active })
+      toast(active ? 'User reactivated' : 'User deactivated')
+      reload()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
+  async function handleDeleteUser(user) {
+    const typed = window.prompt(
+      `Permanently delete ${user.email}? This cannot be undone.\n\nType the email address to confirm:`
+    )
+    if (typed === null) return
+    if (typed.trim().toLowerCase() !== (user.email ?? '').toLowerCase()) {
+      toast('Email did not match — nothing was deleted', 'error')
+      return
+    }
+    try {
+      await callEdgeFunctionJson('create-user', { action: 'delete_user', user_id: user.id })
+      toast('User deleted')
+      if (openUserId === user.id) setOpenUserId(null)
+      reload()
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
   const q = filter.trim().toLowerCase()
+  const inactiveCount = users.filter(u => u.active === false).length
   const shown = users.filter(u =>
-    !q || (u.full_name ?? '').toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q)
+    (showInactive || u.active !== false) &&
+    (!q || (u.full_name ?? '').toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q))
   )
 
   if (loading) return <p className="muted">Loading…</p>
@@ -150,24 +186,31 @@ export default function UsersManager({ departments, courses, grades }) {
       </div>
 
       <div className="section-title-row">
-        <h3>All users ({users.length})</h3>
-        <input
-          className="user-filter"
-          type="search"
-          placeholder="Filter by name or email…"
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-        />
+        <h3>Users ({shown.length}{inactiveCount > 0 && !showInactive ? ` of ${users.length}` : ''})</h3>
+        <div className="tbl-actions">
+          <label className="muted">
+            <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />
+            {' '}Show inactive users{inactiveCount > 0 ? ` (${inactiveCount})` : ''}
+          </label>
+          <input
+            className="user-filter"
+            type="search"
+            placeholder="Filter by name or email…"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          />
+        </div>
       </div>
 
       {shown.map(user => {
         const mine = assignments.filter(a => a.user_id === user.id)
         const open = openUserId === user.id
         return (
-          <div key={user.id} className="card user-card">
+          <div key={user.id} className={`card user-card${user.active === false ? ' user-inactive' : ''}`}>
             <div className="user-card-header">
               <div>
                 <strong>{user.full_name || '(no name)'}</strong> <span className="muted">{user.email}</span>
+                {user.active === false && <span className="chip chip-inactive">Inactive</span>}
               </div>
               <div className="tbl-actions">
                 <select value={user.role} onChange={e => handleRoleChange(user.id, e.target.value)}>
@@ -177,6 +220,14 @@ export default function UsersManager({ departments, courses, grades }) {
                 <button className="btn btn-ghost btn-sm" onClick={() => setOpenUserId(open ? null : user.id)}>
                   {open ? 'Hide' : 'Assignments'} ({mine.length})
                 </button>
+                {user.id !== currentUserId && (
+                  <>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleSetActive(user, user.active === false)}>
+                      {user.active === false ? 'Reactivate' : 'Deactivate'}
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteUser(user)}>Delete</button>
+                  </>
+                )}
               </div>
             </div>
 

@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar'
 import CoursePanel from './components/CoursePanel'
 import ManageDepartments from './components/ManageDepartments'
 import UsersManager from './components/UsersManager'
+import { LOGO_URL } from './branding'
 import NotificationsPanel from './components/NotificationsPanel'
 import ChangePasswordPanel from './components/ChangePasswordPanel'
 import { roleLabel } from './stageUtils'
@@ -75,7 +76,7 @@ export default function Shell({ session, profile }) {
     <>
       <header className="app-header">
         <div className="header-brand">
-          <img src="/meas-logo-small.png" alt="MEAS" />
+          <img src={LOGO_URL} alt="MEAS" />
           <span className="brand-text"><Brand onDark /></span>
         </div>
 
@@ -142,7 +143,7 @@ export default function Shell({ session, profile }) {
           )}
 
           {!loading && view === 'users' && admin && (
-            <UsersManager departments={departments} courses={courses} grades={grades} />
+            <UsersManager departments={departments} courses={courses} grades={grades} currentUserId={userId} />
           )}
 
           {!loading && view === 'courses' && (

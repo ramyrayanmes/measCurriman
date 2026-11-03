@@ -392,6 +392,8 @@
 @media (max-width: 700px) { .compare-head, .compare-cols { grid-template-columns: 1fr; } }
 
 /* ---------- Users ---------- */
+.user-inactive { opacity: 0.7; background: var(--bg); }
+.chip.chip-inactive { margin-left: 8px; background: var(--danger-light); border-color: #fca5a5; color: var(--danger); }
 .bulk-upload-header { display: flex; justify-content: space-between; align-items: center; }
 .user-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .user-filter { border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; background: var(--surface); min-width: 240px; }
