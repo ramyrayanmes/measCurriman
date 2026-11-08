@@ -9,6 +9,7 @@ Run in this order. Skip steps already done on your project. `01` and `02` reset 
 4. `04_rls.sql`
 5. `05_admin_tools.sql`
 6. `06_user_status.sql`
+7. `07_manage_courses.sql` – enables permanent course deletion
 
 ## 2. Edge functions
 ```
@@ -36,6 +37,7 @@ Deploy the `app/dist` output (Cloudflare). Logo: `app/src/branding.js` (`LOGO_UR
 
 ## 6. Smoke test
 - Admin: Manage (departments, courses), Users (create, deactivate, delete), Reports (Preview, Send test).
+- Manage: edit departments, grades, regular courses and electives. Deleting a grade is blocked while courses use it; deleting a course permanently removes its associated content.
 - Teacher: edit a curriculum, save a version, import Word, export Word and PDF, create a weekly plan.
 - Reviewer: set a version Official, compare versions, confirm notification emails arrive.
 - Auditor: sees only Official versions, PDF only, download is logged.

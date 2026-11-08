@@ -35,7 +35,7 @@ export default function ManageDepartments({ grades, departments, courses, onChan
     <div className="cv-wrap">
       <div className="cv-topbar">
         <div>
-          <h2 className="cv-title">Manage Departments</h2>
+          <h2 className="cv-title">Manage Departments, Grades and Courses</h2>
           <p className="cv-subtitle">Departments, grades, courses and electives. Archiving hides items without deleting any content.</p>
         </div>
       </div>
@@ -46,7 +46,7 @@ export default function ManageDepartments({ grades, departments, courses, onChan
         departments={departments} courses={courses} busy={busy} run={run} archiveToggle={archiveToggle}
       />
       <GradesSection
-        grades={grades} busy={busy} run={run} archiveToggle={archiveToggle}
+        grades={grades} courses={courses} busy={busy} run={run} archiveToggle={archiveToggle}
       />
       <CoursesSection
         departments={departments} grades={grades} courses={courses}
@@ -61,6 +61,7 @@ function DepartmentsSection({ departments, courses, busy, run, archiveToggle }) 
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('📘')
   const [kind, setKind] = useState('department')
+  const [editing, setEditing] = useState(null)
 
   async function handleDelete(d) {
     const count = courses.filter(c => c.department_id === d.id).length
@@ -81,11 +82,11 @@ function DepartmentsSection({ departments, courses, busy, run, archiveToggle }) 
     if (ok) setName('')
   }
 
-  function rename(d) {
-    const next = prompt('Department name', d.name)
-    if (next && next.trim() && next.trim() !== d.name) {
-      run(supabase.from('departments').update({ name: next.trim() }).eq('id', d.id))
-    }
+  async function saveEdit(e) {
+    e.preventDefault()
+    const ok = await run(supabase.from('departments')
+      .update({ name: editing.name.trim(), icon: editing.icon.trim() || '📘' }).eq('id', editing.id))
+    if (ok) setEditing(null)
   }
 
   return (
@@ -102,7 +103,7 @@ function DepartmentsSection({ departments, courses, busy, run, archiveToggle }) 
                 <td>{d.kind === 'elective' ? 'Elective group' : 'Department'}</td>
                 <td>
                   <div className="tbl-actions">
-                    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => rename(d)}>Rename</button>
+                    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing({ id: d.id, name: d.name, icon: d.icon })}>Edit</button>
                     <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => archiveToggle('departments', d)}>
                       {d.archived_at ? 'Restore' : 'Archive'}
                     </button>
@@ -115,6 +116,14 @@ function DepartmentsSection({ departments, courses, busy, run, archiveToggle }) 
           </tbody>
         </table>
       </div>
+      {editing && (
+        <form className="inline-form" onSubmit={saveEdit}>
+          <label>Department name <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} required /></label>
+          <label>Icon <input value={editing.icon} onChange={e => setEditing({ ...editing, icon: e.target.value })} /></label>
+          <button className="btn btn-primary btn-sm" disabled={busy || !editing.name.trim()}>Save</button>
+          <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
+        </form>
+      )}
       <form className="inline-form" onSubmit={handleAdd}>
         <input value={icon} onChange={e => setIcon(e.target.value)} style={{ width: 60 }} aria-label="Icon" />
         <input value={name} onChange={e => setName(e.target.value)} placeholder="New department name" required />
@@ -128,7 +137,7 @@ function DepartmentsSection({ departments, courses, busy, run, archiveToggle }) 
   )
 }
 
-function GradesSection({ grades, busy, run, archiveToggle }) {
+function GradesSection({ grades, courses, busy, run, archiveToggle }) {
   const [name, setName] = useState('')
   const [stage, setStage] = useState('elementary')
 
@@ -146,6 +155,24 @@ function GradesSection({ grades, busy, run, archiveToggle }) {
     }
   }
 
+  async function handleDelete(g) {
+    const count = courses.filter(c => c.grade_id === g.id).length
+    if (count) {
+      window.alert(`Cannot delete "${g.name}": ${count} course(s) use this grade. Delete or move those courses first.`)
+      return
+    }
+    const typed = window.prompt(`Permanently delete grade "${g.name}"? This cannot be undone.\n\nType the grade name to confirm:`)
+    if (typed === null) return
+    if (typed.trim() !== g.name) { window.alert('The name did not match. Nothing was deleted.'); return }
+    await run(supabase.from('grades').delete().eq('id', g.id), 'Grade deleted')
+  }
+
+  function changeStage(g, stage) {
+    if (stage === g.stage) return
+    if (!window.confirm(`Change "${g.name}" to ${STAGE_LABELS[stage]}? Its courses move to this stage, changing stage-head access.`)) return
+    run(supabase.from('grades').update({ stage }).eq('id', g.id))
+  }
+
   return (
     <>
       <div className="section-title-row"><h3>Grades</h3></div>
@@ -160,7 +187,8 @@ function GradesSection({ grades, busy, run, archiveToggle }) {
                   <select
                     value={g.stage}
                     disabled={busy}
-                    onChange={e => run(supabase.from('grades').update({ stage: e.target.value }).eq('id', g.id))}
+                    onChange={e => changeStage(g, e.target.value)}
+                    aria-label={`Stage for ${g.name}`}
                   >
                     {STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
                   </select>
@@ -171,6 +199,7 @@ function GradesSection({ grades, busy, run, archiveToggle }) {
                     <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => archiveToggle('grades', g)}>
                       {g.archived_at ? 'Restore' : 'Archive'}
                     </button>
+                    <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => handleDelete(g)}>Delete</button>
                   </div>
                 </td>
               </tr>
@@ -199,6 +228,7 @@ function CoursesSection({ departments, grades, courses, gradeById, deptById, bus
   const [elDeptId, setElDeptId] = useState('')
   const [elName, setElName] = useState('')
   const [elStage, setElStage] = useState('high')
+  const [editing, setEditing] = useState(null)
 
   const existingGradeIds = new Set(courses.filter(c => c.department_id === deptId).map(c => c.grade_id))
   const addable = activeGrades.filter(g => !existingGradeIds.has(g.id))
@@ -224,6 +254,36 @@ function CoursesSection({ departments, grades, courses, gradeById, deptById, bus
     if (ok) setElName('')
   }
 
+  function startEdit(c) {
+    setEditing({ id: c.id, department_id: c.department_id, grade_id: c.grade_id, name: c.name ?? '', stage: c.stage })
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault()
+    const original = courses.find(c => c.id === editing.id)
+    if (!original) { window.alert('This course no longer exists.'); return }
+    const moving = original.department_id !== editing.department_id || original.grade_id !== editing.grade_id ||
+      (!original.grade_id && original.stage !== editing.stage)
+    if (moving && !window.confirm('Moving this course keeps its curricula, plans and assignments with it, and may change stage-head access. Continue?')) return
+    const updates = original.grade_id
+      ? { department_id: editing.department_id, grade_id: editing.grade_id }
+      : { department_id: editing.department_id, name: editing.name.trim(), stage: editing.stage }
+    const ok = await run(supabase.from('courses').update(updates).eq('id', editing.id))
+    if (ok) setEditing(null)
+  }
+
+  async function handleDelete(c) {
+    const label = `${deptById.get(c.department_id)?.name ?? 'Department'} - ${courseLabel(c, gradeById)}`
+    const typed = window.prompt(
+      `PERMANENTLY delete "${label}"?\n\nThis also deletes its official and saved curriculum versions, working copies, ` +
+      `comments, weekly plans, lesson periods, assignments and notifications. This cannot be undone.\n\nType the course name "${courseLabel(c, gradeById)}" to confirm:`
+    )
+    if (typed === null) return
+    if (typed.trim() !== courseLabel(c, gradeById)) { window.alert('The name did not match. Nothing was deleted.'); return }
+    const ok = await run(supabase.rpc('delete_course', { p_course: c.id }), 'Course deleted')
+    if (ok && editing?.id === c.id) setEditing(null)
+  }
+
   const sorted = [...courses].sort((a, b) =>
     (deptById.get(a.department_id)?.name ?? '').localeCompare(deptById.get(b.department_id)?.name ?? '') ||
     (gradeById.get(a.grade_id)?.sort_order ?? 999) - (gradeById.get(b.grade_id)?.sort_order ?? 999) ||
@@ -244,9 +304,11 @@ function CoursesSection({ departments, grades, courses, gradeById, deptById, bus
                 <td>{STAGE_LABELS[c.stage]}</td>
                 <td>
                   <div className="tbl-actions">
+                    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => startEdit(c)}>Edit</button>
                     <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => archiveToggle('courses', c)}>
                       {c.archived_at ? 'Restore' : 'Archive'}
                     </button>
+                    <button className="btn btn-danger btn-sm" disabled={busy} onClick={() => handleDelete(c)}>Delete</button>
                   </div>
                 </td>
               </tr>
@@ -255,6 +317,44 @@ function CoursesSection({ departments, grades, courses, gradeById, deptById, bus
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <div className="card">
+          <h3>Edit course</h3>
+          <form className="curriculum-form" onSubmit={saveEdit}>
+            <label>
+              {editing.grade_id ? 'Department' : 'Elective group'}
+              <select value={editing.department_id} onChange={e => setEditing({ ...editing, department_id: e.target.value })} required>
+                {departments.filter(d => d.kind === (editing.grade_id ? 'department' : 'elective') && (!d.archived_at || d.id === editing.department_id))
+                  .map(d => <option key={d.id} value={d.id}>{d.name}{d.archived_at ? ' (archived)' : ''}</option>)}
+              </select>
+            </label>
+            {editing.grade_id ? (
+              <label>
+                Grade
+                <select value={editing.grade_id} onChange={e => setEditing({ ...editing, grade_id: e.target.value })} required>
+                  {grades.filter(g => !g.archived_at || g.id === editing.grade_id)
+                    .map(g => <option key={g.id} value={g.id}>{g.name}{g.archived_at ? ' (archived)' : ''}</option>)}
+                </select>
+              </label>
+            ) : (
+              <>
+                <label>Elective name <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} required /></label>
+                <label>
+                  Stage
+                  <select value={editing.stage} onChange={e => setEditing({ ...editing, stage: e.target.value })}>
+                    {STAGES.map(s => <option key={s} value={s}>{STAGE_LABELS[s]}</option>)}
+                  </select>
+                </label>
+              </>
+            )}
+            <div className="form-actions">
+              <button className="btn btn-primary" disabled={busy || (!editing.grade_id && !editing.name.trim())}>Save</button>
+              <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Add grades to a department</h3>
