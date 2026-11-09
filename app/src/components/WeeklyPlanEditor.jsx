@@ -44,7 +44,7 @@ export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existing
 
   if (!plan) {
     return (
-      <div>
+      <div className="card">
         <h3>New Weekly Plan</h3>
         <WeeklyPlanHeaderForm
           courseId={courseId}
@@ -59,7 +59,7 @@ export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existing
 
   if (editingPeriod) {
     return (
-      <div>
+      <div className="card">
         <h3>{editingPeriod === 'new' ? 'Add' : 'Edit'} Class Period</h3>
         <LessonPeriodForm
           weeklyPlanId={plan.id}
@@ -103,7 +103,7 @@ export default function WeeklyPlanEditor({ courseId, defaultGradeLevel, existing
                 )}
               </div>
               <p><strong>Objectives:</strong> {p.learning_objectives}</p>
-              <p><strong>Description:</strong> {p.description_of_lesson}</p>
+              <p><strong>Lesson title:</strong> {p.description_of_lesson}</p>
               <p><strong>Book & Pages:</strong> {p.book_pages}</p>
               <p><strong>Bloom's:</strong> {(p.blooms_levels ?? []).map(n => BLOOMS_LABELS[n]).join(', ')}</p>
             </div>

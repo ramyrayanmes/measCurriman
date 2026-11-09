@@ -12,15 +12,17 @@
 //
 // Two ways to call it:
 //   1. Cron:  header  x-cron-secret: <CRON_SECRET>   (always sends for real unless body.mode = "test")
-//   2. Admin: normal login token, body { mode: "preview" | "test" | "send", week_start?: "YYYY-MM-DD" }
+//   2. Admin or reviewer: login token, body { mode: "preview" | "test" | "send", week_start?: "YYYY-MM-DD" }
 //        preview = return the report as JSON, send nothing
-//        test    = send every email, but only to the calling admin
-//        send    = send for real
+//        test    = deliver test emails only to the caller
+//        send    = admins send to reviewers and the central address; heads send
+//                  only their scoped report to themselves
 //
 // Deploy with:  supabase functions deploy weekly-compliance-report --no-verify-jwt
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { isCourseInReviewScope, teacherCompliance } from "./compliance.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -106,18 +108,30 @@ function esc(s: unknown): string {
 
 // ---------------- report building ----------------
 
-async function buildReport(admin: any, weekStart: string) {
+async function fetchAll(query: any) {
+  const rows: any[] = [];
+  for (let start = 0; ; start += 1000) {
+    const { data, error } = await query.range(start, start + 999);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < 1000) return rows;
+  }
+}
+
+async function buildReport(admin: any, weekStart: string, scope: { role: string; userId: string } | null) {
   const weekEnd = addDays(weekStart, 4); // Thursday
   const createdFrom = cairoMidnightUtc(weekStart);
   const createdTo = cairoMidnightUtc(addDays(weekStart, 7));
 
-  const [{ data: courses }, { data: assigns }, { data: profiles }] = await Promise.all([
-    admin.from("courses")
+  const [allCourses, assigns, profiles] = await Promise.all([
+    fetchAll(admin.from("courses")
       .select("id, name, stage, departments(name, sort_order), grades(name, sort_order)")
-      .is("archived_at", null),
-    admin.from("course_assignments").select("user_id, course_id, kind"),
-    admin.from("profiles").select("id, full_name, email, role, active"),
+      .is("archived_at", null).order("id")),
+    fetchAll(admin.from("course_assignments").select("user_id, course_id, kind")
+      .order("course_id").order("user_id").order("kind")),
+    fetchAll(admin.from("profiles").select("id, full_name, email, role, active").order("id")),
   ]);
+  const courses = scope ? allCourses.filter((c: any) => isCourseInReviewScope(c, scope, assigns)) : allCourses;
 
   const profileById = new Map<string, any>((profiles ?? []).map((p: any) => [p.id, p]));
   const isActive = (id: string) => profileById.get(id)?.active !== false;
@@ -125,22 +139,22 @@ async function buildReport(admin: any, weekStart: string) {
   const planCols = "id, course_id, teacher_id, week_number, semester, date_from, date_to, created_at";
 
   // Plans whose date range overlaps the Sunday-Thursday week
-  const { data: weekPlans } = await admin
+  const weekPlans = await fetchAll(admin
     .from("weekly_plans").select(planCols)
-    .lte("date_from", weekEnd).gte("date_to", weekStart);
+    .lte("date_from", weekEnd).gte("date_to", weekStart).order("id"));
 
   // Retroactive: created during the report week, but dates entirely before it
-  const { data: retroPlans } = await admin
+  const retroPlans = await fetchAll(admin
     .from("weekly_plans").select(planCols)
     .gte("created_at", createdFrom).lt("created_at", createdTo)
-    .lt("date_to", weekStart);
+    .lt("date_to", weekStart).order("id"));
 
   // Named versions saved during the report week
-  const { data: weekVersions } = await admin
+  const weekVersions = await fetchAll(admin
     .from("curriculum_versions")
     .select("course_id, version_number, name, author_id, change_summary, created_at")
     .gte("created_at", createdFrom).lt("created_at", createdTo)
-    .order("created_at");
+    .order("created_at").order("id"));
 
   const person = (id: string) => {
     const p = profileById.get(id);
@@ -163,7 +177,7 @@ async function buildReport(admin: any, weekStart: string) {
         ...person(a.user_id),
         submitted: plans.length > 0,
         plans: plans.map((w: any) => ({
-          week_number: w.week_number, semester: w.semester, date_from: w.date_from, date_to: w.date_to,
+          week_number: w.week_number, semester: w.semester, date_from: w.date_from, date_to: w.date_to, course_title: title,
         })),
       };
     });
@@ -194,8 +208,13 @@ async function buildReport(admin: any, weekStart: string) {
     return {
       course_id: c.id, title, stage: c.stage,
       heads: [...headIds].map(person), teachers, retroactive, versions,
+      course_plans: (weekPlans ?? []).filter((w: any) => w.course_id === c.id)
+        .map((w: any) => ({
+          teacher_id: w.teacher_id, course_title: title, week_number: w.week_number,
+          semester: w.semester, date_from: w.date_from, date_to: w.date_to,
+        })),
     };
-  }).filter((r: any) => r.teachers.length > 0 || r.retroactive.length > 0 || r.versions.length > 0);
+  }).filter((r: any) => r.teachers.length > 0 || r.retroactive.length > 0 || r.versions.length > 0 || r.course_plans.length > 0);
 
   return { weekEnd, reports };
 }
@@ -203,7 +222,7 @@ async function buildReport(admin: any, weekStart: string) {
 // ---------------- rendering ----------------
 
 function planLabel(p: any): string {
-  return `Week ${p.week_number} (Sem ${p.semester}): ${p.date_from} to ${p.date_to}`;
+  return `${p.course_title ? `${p.course_title}: ` : ""}Week ${p.week_number} (Sem ${p.semester}): ${p.date_from} to ${p.date_to}`;
 }
 
 function versionLabel(v: any): string {
@@ -263,7 +282,7 @@ function renderCourseText(r: any, showHeads: boolean): string {
   return lines.join("\n");
 }
 
-function planEmails(reports: any[], weekStart: string, weekEnd: string) {
+function planEmails(reports: any[], weekStart: string, weekEnd: string, scoped = false) {
   const label = `${fmtDate(weekStart)} - ${fmtDate(weekEnd)}`;
   const subject = `CurriMan weekly report: ${shortRange(weekStart, weekEnd)}`;
   const wrap = (intro: string, body: string) =>
@@ -287,23 +306,25 @@ function planEmails(reports: any[], weekStart: string, weekEnd: string) {
     }
   }
   for (const h of byHead.values()) {
+    const scopedReports = teacherCompliance(h.reports);
     emails.push({
       to: h.email,
       subject,
       subjects_count: h.reports.length,
-      html: wrap("Status of the course(s) you oversee.", h.reports.map(r => renderCourseHtml(r, false)).join("")),
-      text: `CurriMan - Weekly report - ${label}\n\n` + h.reports.map(r => renderCourseText(r, false)).join("\n\n"),
+      html: wrap("One plan within your scope counts per teacher.", scopedReports.map(r => renderCourseHtml(r, false)).join("")),
+      text: `CurriMan - Weekly report - ${label}\nOne plan within your scope counts per teacher.\n\n` + scopedReports.map(r => renderCourseText(r, false)).join("\n\n"),
     });
   }
 
   // One consolidated email for meas.curricula
   if (reports.length > 0) {
+    const allReports = teacherCompliance(reports);
     emails.push({
       to: SUMMARY_ADDRESS,
-      subject: `${subject} (all courses)`,
+      subject: `${subject} (${scoped ? "your courses" : "all courses"})`,
       subjects_count: reports.length,
-      html: wrap("Consolidated report for all courses.", reports.map(r => renderCourseHtml(r, true)).join("")),
-      text: `CurriMan - Weekly report - ${label} (all courses)\n\n` + reports.map(r => renderCourseText(r, true)).join("\n\n"),
+      html: wrap(scoped ? "Your courses; one plan within your scope counts per teacher." : "Consolidated report; one plan in the school counts per teacher.", allReports.map(r => renderCourseHtml(r, true)).join("")),
+      text: `CurriMan - Weekly report - ${label} (${scoped ? "your courses" : "all courses"})\nOne plan in this scope counts per teacher.\n\n` + allReports.map(r => renderCourseText(r, true)).join("\n\n"),
     });
   }
 
@@ -322,9 +343,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Use POST" }), { status: 405, headers: corsHeaders });
     }
 
-    const body = await req.json().catch(() => ({}));
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Request body must be valid JSON" }), { status: 400, headers: corsHeaders });
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: "Request body must be a JSON object" }), { status: 400, headers: corsHeaders });
+    }
     const mode: string = body.mode ?? "send";
     let testRecipient: string | null = null;
+    let scope: { role: string; userId: string } | null = null;
 
     const cronSecret = Deno.env.get("CRON_SECRET");
     const providedSecret = req.headers.get("x-cron-secret");
@@ -344,9 +374,19 @@ Deno.serve(async (req) => {
       if (userError || !user) {
         return new Response(JSON.stringify({ error: "Not authenticated" }), { status: 401, headers: corsHeaders });
       }
-      const { data: profile } = await userClient.from("profiles").select("role, email, active").eq("id", user.id).single();
-      if (profile?.role !== "admin" || profile?.active === false) {
-        return new Response(JSON.stringify({ error: "Only admins may run this report" }), { status: 403, headers: corsHeaders });
+      const { data: profile, error: profileError } = await userClient.from("profiles").select("role, email, active").eq("id", user.id).single();
+      if (profileError) throw profileError;
+      if (!profile.active) {
+        return new Response(JSON.stringify({ error: "Account is inactive" }), { status: 403, headers: corsHeaders });
+      }
+      if (profile.role !== "admin") {
+        const { data: assignments, error: assignmentError } = await userClient.from("course_assignments")
+          .select("course_id").eq("user_id", user.id).eq("kind", "dept_head").limit(1);
+        if (assignmentError) throw assignmentError;
+        if (!["head_kindergarten", "head_elementary", "head_middle", "head_high", "head_department"].includes(profile.role) && !assignments.length) {
+          return new Response(JSON.stringify({ error: "Only reviewers may run this report" }), { status: 403, headers: corsHeaders });
+        }
+        scope = { role: profile.role, userId: user.id };
       }
       testRecipient = profile.email ?? user.email ?? null;
     }
@@ -354,12 +394,14 @@ Deno.serve(async (req) => {
     if (!["preview", "test", "send"].includes(mode)) {
       return new Response(JSON.stringify({ error: "mode must be preview, test, or send" }), { status: 400, headers: corsHeaders });
     }
-    if (mode === "test" && !testRecipient) {
-      return new Response(JSON.stringify({ error: "Test mode needs a recipient" }), { status: 400, headers: corsHeaders });
+    if ((mode === "test" || scope) && !testRecipient) {
+      return new Response(JSON.stringify({ error: "This mode needs an email recipient" }), { status: 400, headers: corsHeaders });
     }
 
     const weekStart: string = body.week_start ?? defaultWeekStart();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || dayOfWeek(weekStart) !== 0) {
+    const date = new Date(`${weekStart}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || Number.isNaN(date.getTime()) ||
+        date.toISOString().slice(0, 10) !== weekStart || dayOfWeek(weekStart) !== 0) {
       return new Response(JSON.stringify({ error: "week_start must be a Sunday, formatted YYYY-MM-DD" }), { status: 400, headers: corsHeaders });
     }
 
@@ -368,13 +410,16 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { weekEnd, reports } = await buildReport(admin, weekStart);
-    const emails = planEmails(reports, weekStart, weekEnd);
+    const { weekEnd, reports } = await buildReport(admin, weekStart, scope);
+    const planned = planEmails(reports, weekStart, weekEnd, Boolean(scope));
+    const emails = scope
+      ? planned.filter(e => e.to === SUMMARY_ADDRESS).map(e => ({ ...e, to: testRecipient }))
+      : planned;
 
     if (mode === "preview") {
       return new Response(
         JSON.stringify({
-          week_start: weekStart, week_end: weekEnd, courses: reports,
+          week_start: weekStart, week_end: weekEnd, courses: teacherCompliance(reports),
           emails: emails.map(e => ({ to: e.to, subject: e.subject, subjects_count: e.subjects_count })),
         }),
         { status: 200, headers: corsHeaders }
@@ -416,7 +461,7 @@ Deno.serve(async (req) => {
     await client.close();
 
     return new Response(
-      JSON.stringify({ week_start: weekStart, week_end: weekEnd, mode, courses: reports, emails: sent }),
+      JSON.stringify({ week_start: weekStart, week_end: weekEnd, mode, courses: teacherCompliance(reports), emails: sent }),
       { status: 200, headers: corsHeaders }
     );
   } catch (err) {

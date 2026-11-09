@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { useToast } from '../toastContext'
+import { LESSON_PLAN_PROMPT } from '../lessonPlanPrompt'
 
 const BLOOMS = [
   { value: 1, label: 'Remembering' },
@@ -30,6 +31,15 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
 
   function toggleBloom(value) {
     setBloomsLevels(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value])
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(LESSON_PLAN_PROMPT)
+      toast('Lesson-planning prompt copied')
+    } catch (error) {
+      toast(`Could not copy the prompt: ${error.message}. Select the text and copy it manually.`, 'error')
+    }
   }
 
   async function handleSubmit(e) {
@@ -64,6 +74,14 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
 
   return (
     <form onSubmit={handleSubmit} className="curriculum-form period-form">
+      {!existing && (
+        <details>
+          <summary>AI lesson-planning prompt</summary>
+          <p className="muted">Copy and adapt this prompt for your preferred AI tool. Do not include student names or other sensitive information.</p>
+          <pre className="lesson-prompt">{LESSON_PLAN_PROMPT}</pre>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={copyPrompt}>Copy prompt</button>
+        </details>
+      )}
       <label>
         Class / Section
         <input value={classSection} onChange={e => setClassSection(e.target.value)} placeholder="e.g. Grade 3B" />
@@ -77,7 +95,7 @@ export default function LessonPeriodForm({ weeklyPlanId, existing, onSaved, onCa
         <textarea rows={3} value={learningObjectives} onChange={e => setLearningObjectives(e.target.value)} />
       </label>
       <label>
-        Description of Lesson
+        Lesson Title
         <textarea rows={3} value={description} onChange={e => setDescription(e.target.value)} />
       </label>
       <label>

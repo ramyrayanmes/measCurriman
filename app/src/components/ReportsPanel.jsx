@@ -18,7 +18,7 @@ function defaultWeekStart() {
   return addDays(today, -6)
 }
 
-export default function ReportsPanel() {
+export default function ReportsPanel({ isAdmin }) {
   const [weekStart, setWeekStart] = useState(defaultWeekStart())
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
@@ -27,7 +27,9 @@ export default function ReportsPanel() {
   const isSunday = weekStart && new Date(weekStart + 'T00:00:00Z').getUTCDay() === 0
 
   async function run(mode) {
-    if (mode === 'send' && !confirm('Send the report to every stage head, head of department and meas.curricula@mes.edu.eg now?')) return
+    if (mode === 'send' && !confirm(isAdmin
+      ? 'Send the report to every stage head, head of department and meas.curricula@mes.edu.eg now?'
+      : 'Send a report for your courses to your own email address?')) return
     setBusy(mode)
     setError(null)
     setResult(null)
@@ -41,11 +43,13 @@ export default function ReportsPanel() {
   }
 
   return (
-    <div>
-      <h2>Weekly submission report</h2>
+    <div className="card">
+      <h2 className="cv-title">Weekly submission report</h2>
       <p className="hint">
-        The report is emailed automatically every Saturday morning (Cairo time) to the stage heads, heads of
-        department and meas.curricula@mes.edu.eg. Use this page to preview it or send it on demand.
+        The scheduled report goes to reviewers and meas.curricula@mes.edu.eg. {isAdmin
+          ? 'Preview it or send it to everyone on demand.'
+          : 'Your preview and emails contain only courses you oversee, and are sent only to you.'}
+        {' '}One plan in the report's scope counts per teacher, even when they are assigned to multiple courses.
       </p>
 
       <div className="inline-form">
@@ -53,14 +57,14 @@ export default function ReportsPanel() {
           Week starting (Sunday)&nbsp;
           <input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)} />
         </label>
-        <button onClick={() => run('preview')} disabled={!isSunday || busy} className="secondary">
+        <button onClick={() => run('preview')} disabled={!isSunday || busy} className="btn btn-ghost">
           {busy === 'preview' ? 'Loading…' : 'Preview'}
         </button>
-        <button onClick={() => run('test')} disabled={!isSunday || busy} className="secondary">
+        <button onClick={() => run('test')} disabled={!isSunday || busy} className="btn btn-ghost">
           {busy === 'test' ? 'Sending…' : 'Send test to me'}
         </button>
-        <button onClick={() => run('send')} disabled={!isSunday || busy}>
-          {busy === 'send' ? 'Sending…' : 'Send to everyone'}
+        <button onClick={() => run('send')} disabled={!isSunday || busy} className="btn btn-primary">
+          {busy === 'send' ? 'Sending…' : isAdmin ? 'Send to everyone' : 'Send report to me'}
         </button>
       </div>
       {!isSunday && <p className="error">Please pick a Sunday — weeks run Sunday to Thursday.</p>}
@@ -96,7 +100,7 @@ export default function ReportsPanel() {
               <p className="muted">
                 Reviewer(s): {s.heads.length ? s.heads.map(h => h.name).join(', ') : 'none assigned'}
               </p>
-              <table className="data-table">
+              <div className="report-table-wrap"><table className="data-table">
                 <thead><tr><th>Teacher</th><th>Status</th><th>Plan(s)</th></tr></thead>
                 <tbody>
                   {s.teachers.map(t => (
@@ -105,12 +109,12 @@ export default function ReportsPanel() {
                       <td className={t.submitted ? 'status-ok' : 'status-missing'}>
                         {t.submitted ? '✓ Submitted' : '✗ Not submitted'}
                       </td>
-                      <td>{t.plans.map(p => `Week ${p.week_number} (Sem ${p.semester}): ${p.date_from} to ${p.date_to}`).join('; ') || '—'}</td>
+                      <td>{t.plans.map(p => `${p.course_title ? `${p.course_title}: ` : ''}Week ${p.week_number} (Sem ${p.semester}): ${p.date_from} to ${p.date_to}`).join('; ') || '—'}</td>
                     </tr>
                   ))}
                   {s.teachers.length === 0 && <tr><td colSpan={3} className="muted">No teachers assigned.</td></tr>}
                 </tbody>
-              </table>
+              </table></div>
               {s.retroactive.length > 0 && (
                 <>
                   <p><strong>Retroactive submissions</strong> (created this week for earlier weeks):</p>

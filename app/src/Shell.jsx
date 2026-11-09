@@ -7,6 +7,7 @@ import CoursePanel from './components/CoursePanel'
 import ManageDepartments from './components/ManageDepartments'
 import UsersManager from './components/UsersManager'
 import ReportsPanel from './components/ReportsPanel'
+import ReportsDashboard from './components/ReportsDashboard'
 import { LOGO_URL } from './branding'
 import NotificationsPanel from './components/NotificationsPanel'
 import ChangePasswordPanel from './components/ChangePasswordPanel'
@@ -27,6 +28,7 @@ export default function Shell({ session, profile }) {
   const [error, setError] = useState(null)
 
   const [view, setView] = useState('courses')
+  const [reportsTab, setReportsTab] = useState('dashboard')
   const [courseId, setCourseId] = useState(null)
   const [target, setTarget] = useState(null) // deep link from a notification: { versionId, nonce }
   const [collapsed, setCollapsed] = useState(() => window.matchMedia(MOBILE_QUERY).matches)
@@ -80,12 +82,17 @@ export default function Shell({ session, profile }) {
     return true
   }
 
+  function openReview(courseId, versionId) {
+    openNotification({ course_id: courseId, related_table: 'curriculum_versions', related_id: versionId })
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut()
   }
 
   const sidebarVisible = view === 'courses' && !collapsed
   const hasCourses = courses.length > 0
+  const canReports = admin || profile.role.startsWith('head_') || assignments.some(a => a.kind === 'dept_head')
 
   return (
     <>
@@ -109,7 +116,7 @@ export default function Shell({ session, profile }) {
               👥 <span className="nav-label">Users</span>
             </button>
           )}
-          {admin && (
+          {canReports && (
             <button className={`nav-tab admin-tab${view === 'reports' ? ' active' : ''}`} onClick={() => setView('reports')}>
               📊 <span className="nav-label">Reports</span>
             </button>
@@ -166,7 +173,18 @@ export default function Shell({ session, profile }) {
             <UsersManager departments={departments} courses={courses} grades={grades} currentUserId={userId} />
           )}
 
-          {!loading && view === 'reports' && admin && <ReportsPanel />}
+          {!loading && view === 'reports' && canReports && (
+            <div className="cv-wrap">
+              <div className="cv-topbar"><h2 className="cv-title">Reports</h2><span className="chip">{admin ? 'Whole school' : 'Your assigned scope'}</span></div>
+              <div className="tabs">
+                <button className={`tab${reportsTab === 'dashboard' ? ' active' : ''}`} onClick={() => setReportsTab('dashboard')}>Dashboard</button>
+                <button className={`tab${reportsTab === 'weekly' ? ' active' : ''}`} onClick={() => setReportsTab('weekly')}>Weekly report</button>
+              </div>
+              {reportsTab === 'dashboard'
+                ? <ReportsDashboard profile={profile} assignments={assignments} courses={courses} departments={departments} grades={grades} onOpenVersion={openReview} />
+                : <ReportsPanel isAdmin={admin} />}
+            </div>
+          )}
 
           {!loading && view === 'courses' && (
             course ? (

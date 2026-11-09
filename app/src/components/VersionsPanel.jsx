@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { useToast } from '../toastContext'
 import { SECTION_LABELS, compareContents } from '../curriculumDiff'
 import PlanDownloadButtons from './PlanDownloadButtons'
+import { fetchAll } from '../supabasePagination'
 
 export default function VersionsPanel({ course, userId, isAdmin, isAuditor, reviewer, canEdit, onView, onUse }) {
   const toast = useToast()
@@ -17,20 +18,28 @@ export default function VersionsPanel({ course, userId, isAdmin, isAuditor, revi
   useEffect(() => {
     let cancelled = false
     Promise.all([
-      supabase.from('curriculum_versions')
+      fetchAll(() => supabase.from('curriculum_versions')
         .select('id, version_number, name, content, author_id, change_note, change_summary, created_at, profiles:author_id(full_name)')
         .eq('course_id', course.id)
-        .order('version_number', { ascending: false }),
+        .order('version_number', { ascending: false })),
       supabase.from('official_versions').select('version_id').eq('course_id', course.id).maybeSingle(),
-    ]).then(([v, o]) => {
+      fetchAll(() => supabase.from('curriculum_reviews')
+        .select('version_id, status, submitted_at, reviewed_at, review_note, migrated, curriculum_versions!inner(course_id)')
+        .eq('curriculum_versions.course_id', course.id).order('version_id')),
+      fetchAll(() => supabase.from('curriculum_review_events')
+        .select('id, version_id, action, note, created_at, profiles:actor_id(full_name), curriculum_versions!inner(course_id)')
+        .eq('curriculum_versions.course_id', course.id).order('id', { ascending: false })),
+    ]).then(([v, o, r, events]) => {
       if (cancelled) return
       setData({
         loading: false,
-        error: (v.error || o.error)?.message,
-        versions: v.data ?? [],
+        error: o.error?.message,
+        versions: v,
         officialId: o.data?.version_id ?? null,
+        reviews: new Map(r.map(review => [review.version_id, review])),
+        reviewEvents: events,
       })
-    })
+    }).catch(error => { if (!cancelled) setData({ loading: false, error: error.message }) })
     return () => { cancelled = true }
   }, [course.id, reloadTick])
 
@@ -40,6 +49,26 @@ export default function VersionsPanel({ course, userId, isAdmin, isAuditor, revi
     if (error) { toast(error.message, 'error'); return }
     toast(`"${v.name}" is now the Current Official version`)
     reload()
+  }
+
+  async function submitReview(v) {
+    if (!window.confirm(`Submit "${v.name}" for review?`)) return
+    const { error } = await supabase.rpc('submit_curriculum_review', { p_version: v.id })
+    if (error) toast(error.message, 'error')
+    else { toast('Version submitted for review'); reload() }
+  }
+
+  async function decideReview(v, decision) {
+    const note = window.prompt(decision === 'returned'
+      ? 'Explain what should be changed (required):'
+      : 'Optional approval comment:', '')
+    if (note === null) return
+    if (decision === 'returned' && !note.trim()) { toast('A return comment is required', 'error'); return }
+    const { error } = await supabase.rpc('decide_curriculum_review', {
+      p_version: v.id, p_decision: decision, p_note: note.trim() || null,
+    })
+    if (error) toast(error.message, 'error')
+    else { toast(decision === 'approved' ? 'Review approved' : 'Version returned for changes'); reload() }
   }
 
   async function editNote(v) {
@@ -102,6 +131,7 @@ export default function VersionsPanel({ course, userId, isAdmin, isAuditor, revi
       {data.versions.map(v => {
         const isOfficial = v.id === data.officialId
         const mine = v.author_id === userId
+        const review = data.reviews.get(v.id)
         return (
           <div key={v.id} className={`card version-row${isOfficial ? ' is-official' : ''}`}>
             <div className="version-head">
@@ -113,6 +143,7 @@ export default function VersionsPanel({ course, userId, isAdmin, isAuditor, revi
                 <strong>v{v.version_number} — {v.name}</strong>
                 {isOfficial && <span className="chip chip-accent">★ Current Official</span>}
                 {mine && <span className="chip">Yours</span>}
+                {review && <span className="chip">Review: {review.status}{review.migrated ? ' (imported)' : ''}</span>}
                 <div className="muted">
                   {v.profiles?.full_name ?? 'Unknown'} • {new Date(v.created_at).toLocaleString()}
                 </div>
@@ -122,6 +153,17 @@ export default function VersionsPanel({ course, userId, isAdmin, isAuditor, revi
                 <PlanDownloadButtons table="curriculum_versions" recordId={v.id} isAuditor={isAuditor} />
                 {canEdit && !course.archived_at && (
                   <button className="btn btn-ghost btn-sm" onClick={() => onUse(v)}>Use as my working copy</button>
+                )}
+                {mine && canEdit && !course.archived_at && (!review || review.status === 'returned') && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => submitReview(v)}>
+                    {review ? 'Resubmit for review' : 'Submit for review'}
+                  </button>
+                )}
+                {reviewer && review?.status === 'pending' && !course.archived_at && (
+                  <>
+                    <button className="btn btn-primary btn-sm" onClick={() => decideReview(v, 'approved')}>Approve review</button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => decideReview(v, 'returned')}>Return for changes</button>
+                  </>
                 )}
                 {reviewer && !isOfficial && !course.archived_at && (
                   <button className="btn btn-primary btn-sm" onClick={() => setOfficial(v)}>★ Set as Official</button>
@@ -137,6 +179,20 @@ export default function VersionsPanel({ course, userId, isAdmin, isAuditor, revi
               ))}
             </div>
             {v.change_note && <p className="version-note">“{v.change_note}”</p>}
+            {review?.review_note && <p className="version-note">Review comment: {review.review_note}</p>}
+            {data.reviewEvents.some(event => event.version_id === v.id) && (
+              <details className="review-history">
+                <summary>Review history</summary>
+                <ul>
+                  {data.reviewEvents.filter(event => event.version_id === v.id).map(event => (
+                    <li key={event.id}>
+                      {event.action} by {event.profiles?.full_name || 'Unknown user'} · {new Date(event.created_at).toLocaleString()}
+                      {event.note && ` — ${event.note}`}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
 
             {isAdmin && (
               <>
